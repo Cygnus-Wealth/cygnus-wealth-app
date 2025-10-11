@@ -30,13 +30,11 @@ export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showZeroBalances, setShowZeroBalances] = useState(false);
   
-  // Get data from global store
-  const { 
-    accounts, 
-    assets, 
-    portfolio, 
-    prices
-  } = useStore();
+  // Get data from global store - use selectors to prevent unnecessary re-renders
+  const accounts = useStore(state => state.accounts);
+  const assets = useStore(state => state.assets);
+  const portfolio = useStore(state => state.portfolio);
+  const prices = useStore(state => state.prices);
   
   // Sync account balances
   useAccountSync();

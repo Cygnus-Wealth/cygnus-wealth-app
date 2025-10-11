@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
@@ -72,86 +72,94 @@ export function useAccountSync() {
   // Get all wallet accounts
   const walletAccounts = accounts.filter(acc => acc.type === 'wallet' && acc.status === 'connected');
 
-  // Fetch EVM balances using evm-integration library
-  const fetchEvmBalances = useCallback(async (address: string, chainName: string, accountId: string, accountLabel: string) => {
-    const assets: Asset[] = [];
-    
-    try {
-      const chainConfig = chainMap[chainName];
-      if (!chainConfig) {
-        console.warn(`No chain config for ${chainName}`);
-        return assets;
-      }
-
-      // Create a new client directly
-      const client = createEvmClient(chainName);
-
-      // Fetch native token balance
-      const balance = await client.getBalance({ 
-        address: address as Address 
-      });
-
-      // Skip zero balances
-      if (balance > 0n) {
-        // Get native token price
-        let priceData = { price: 0 };
-        try {
-          priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
-          updatePrice(chainConfig.symbol, priceData?.price || 0);
-        } catch {
-          console.warn(`Price not available for ${chainConfig.symbol}`);
-        }
-
-        // Create asset entry for native token
-        const asset: Asset = {
-          id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
-          symbol: chainConfig.symbol,
-          name: chainConfig.name,
-          balance: formatBalance(balance.toString(), 18),
-          source: accountLabel,
-          chain: chainName,
-          accountId: accountId,
-          priceUsd: priceData?.price || 0,
-          valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * (priceData?.price || 0),
-          metadata: {
-            address: address,
-            isMultiAccount: false
-          }
-        };
-        
-        assets.push(asset);
-      }
-
-      // TODO: Fetch ERC20 token balances using evm-integration hooks when component-based
-
-    } catch (error) {
-      console.error(`Error fetching EVM balances for ${chainName} - ${address}:`, error);
-    }
-
-    return assets;
-  }, [updatePrice]);
-
   // Use a ref to track the last synced accounts to prevent infinite loops
   const lastSyncedAccountsRef = useRef<string>('');
   
   // Sync each wallet account
   useEffect(() => {
+    console.log('[useAccountSync] Effect triggered, walletAccounts:', walletAccounts.length);
+    
     // Create a unique key for current wallet accounts
     const accountsKey = walletAccounts.map(a => `${a.id}-${a.address}-${a.platform}`).join(',');
     
     // Skip if we've already synced these exact accounts
     if (accountsKey === lastSyncedAccountsRef.current) {
+      console.log('[useAccountSync] Skipping sync - accounts unchanged');
       return;
     }
     
+    console.log('[useAccountSync] Starting sync for accounts:', accountsKey);
+    
     const syncAccounts = async () => {
+      // Define fetchEvmBalances inside the effect to avoid dependency issues
+      const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
+        console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
+        const assets: Asset[] = [];
+        
+        try {
+          const chainConfig = chainMap[chainName];
+          if (!chainConfig) {
+            console.warn(`No chain config for ${chainName}`);
+            return assets;
+          }
+
+          // Create a new client directly
+          const client = createEvmClient(chainName);
+
+          // Fetch native token balance
+          const balance = await client.getBalance({ 
+            address: address as Address 
+          });
+
+          // Skip zero balances
+          if (balance > 0n) {
+            // Get native token price
+            let priceData = { price: 0 };
+            try {
+              priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
+              updatePrice(chainConfig.symbol, priceData?.price || 0);
+            } catch {
+              console.warn(`Price not available for ${chainConfig.symbol}`);
+            }
+
+            // Create asset entry for native token
+            const asset: Asset = {
+              id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
+              symbol: chainConfig.symbol,
+              name: chainConfig.name,
+              balance: formatBalance(balance.toString(), 18),
+              source: accountLabel,
+              chain: chainName,
+              accountId: accountId,
+              priceUsd: priceData?.price || 0,
+              valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * (priceData?.price || 0),
+              metadata: {
+                address: address,
+                isMultiAccount: false
+              }
+            };
+            
+            assets.push(asset);
+          }
+
+          // TODO: Fetch ERC20 token balances using evm-integration hooks when component-based
+
+        } catch (error) {
+          console.error(`Error fetching EVM balances for ${chainName} - ${address}:`, error);
+        }
+
+        return assets;
+      };
+      
       if (walletAccounts.length === 0) {
+        console.log('[useAccountSync] No wallet accounts, clearing assets');
         setAssets([]);
         calculateTotalValue();
         lastSyncedAccountsRef.current = '';
         return;
       }
 
+      console.log('[useAccountSync] Beginning asset sync for', walletAccounts.length, 'accounts');
       setIsLoading(true);
       const allAssets: Asset[] = [];
       
@@ -211,7 +219,7 @@ export function useAccountSync() {
     };
 
     syncAccounts();
-  }, [walletAccounts, setAssets, calculateTotalValue, setIsLoading, fetchEvmBalances]);
+  }, [walletAccounts, setAssets, calculateTotalValue, setIsLoading, updatePrice]);
 
   return {
     isLoading: useStore(state => state.isLoading),

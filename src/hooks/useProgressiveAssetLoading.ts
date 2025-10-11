@@ -284,19 +284,29 @@ export const useProgressiveAssetLoading = (
   const loadingStartedRef = useRef<string>('');
   
   useEffect(() => {
+    // TEMPORARILY DISABLED to debug performance issue
+    console.log('[useProgressiveAssetLoading] Effect triggered but DISABLED for debugging, assets:', assets.length);
+    return;
+    
     // Create a unique key for the current assets to check if we've already started loading
     const assetsKey = assets.map(a => a.id).join(',');
     
+    console.log('[useProgressiveAssetLoading] Effect triggered, assets:', assets.length, 'key:', assetsKey.substring(0, 50));
+    
     if (assets.length > 0 && loadingStartedRef.current !== assetsKey) {
+      console.log('[useProgressiveAssetLoading] Starting progressive loading for', assets.length, 'assets');
       loadingStartedRef.current = assetsKey;
       
       // Stagger the loading to avoid overwhelming the API
       assets.forEach((asset, index) => {
         setTimeout(() => {
+          console.log('[useProgressiveAssetLoading] Loading asset', asset.id);
           loadAssetBalance(asset);
           loadAssetPrice(asset);
         }, index * staggerDelay);
       });
+    } else if (loadingStartedRef.current === assetsKey) {
+      console.log('[useProgressiveAssetLoading] Skipping - already loading these assets');
     }
   }, [assets, loadAssetBalance, loadAssetPrice, staggerDelay]);
 
