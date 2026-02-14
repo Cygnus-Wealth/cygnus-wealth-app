@@ -20,7 +20,7 @@ vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
 
 // Mock createToaster to avoid Chakra UI issues
 vi.mock('@chakra-ui/react', async () => {
-  const actual = await vi.importActual('@chakra-ui/react') as any;
+  const actual = await vi.importActual<typeof import('@chakra-ui/react')>('@chakra-ui/react');
   return {
     ...actual,
     createToaster: () => ({

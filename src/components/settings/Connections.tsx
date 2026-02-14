@@ -128,7 +128,7 @@ export default function Connections() {
     
     // If this account uses WalletManager, disconnect through it
     if (account.metadata?.useWalletManager) {
-      const walletManager = (window as any).__cygnusWalletManager as any;
+      const walletManager = (window as unknown as Record<string, unknown>).__cygnusWalletManager as { disconnectWallet: (chain: unknown) => Promise<void> } | undefined;
       if (walletManager && account.metadata?.walletManagerId) {
         try {
           // Find all accounts with the same walletManagerId

@@ -164,10 +164,10 @@ export class RpcConfigurationService {
         const customConfigs = JSON.parse(stored);
         
         // Merge custom configurations with defaults
-        for (const [chain, config] of Object.entries(customConfigs) as Array<[SupportedChain, any]>) {
+        for (const [chain, config] of Object.entries(customConfigs) as Array<[SupportedChain, { customEndpoints?: Array<{ url: string; name: string; isHealthy?: boolean }>; activeEndpoint?: string }]>) {
           const existingConfig = this.configs.get(chain);
           if (existingConfig && config.customEndpoints) {
-            existingConfig.customEndpoints = config.customEndpoints.map((endpoint: any) => ({
+            existingConfig.customEndpoints = config.customEndpoints.map((endpoint: { url: string; name: string; isHealthy?: boolean }) => ({
               ...endpoint,
               isHealthy: endpoint.isHealthy ?? true
             }));
@@ -189,7 +189,7 @@ export class RpcConfigurationService {
    */
   private saveConfigurations(): void {
     try {
-      const configsToSave: Record<string, any> = {};
+      const configsToSave: Record<string, { customEndpoints: RpcEndpoint[]; activeEndpoint: string }> = {};
       
       for (const [chain, config] of this.configs.entries()) {
         configsToSave[chain] = {
@@ -379,7 +379,7 @@ export class RpcConfigurationService {
         isHealthy: response.ok && response.status === 200,
         responseTime
       };
-    } catch (error) {
+    } catch {
       return {
         isHealthy: false,
         responseTime: Date.now() - startTime

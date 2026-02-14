@@ -3,8 +3,8 @@
 
 // Check if we're in a SES lockdown environment
 export const isSESEnvironment = () => {
-  return typeof (globalThis as any).lockdown === 'function' || 
-         typeof (globalThis as any).harden === 'function';
+  return typeof (globalThis as Record<string, unknown>).lockdown === 'function' ||
+         typeof (globalThis as Record<string, unknown>).harden === 'function';
 };
 
 // Ensure Date methods are compatible with SES
@@ -14,7 +14,7 @@ export const safeDate = {
   toLocaleString: (date: Date, locales?: string | string[], options?: Intl.DateTimeFormatOptions) => {
     try {
       return date.toLocaleString(locales, options);
-    } catch (e) {
+    } catch {
       // Fallback for SES environments
       return date.toString();
     }
@@ -22,7 +22,7 @@ export const safeDate = {
   toLocaleTimeString: (date: Date, locales?: string | string[], options?: Intl.DateTimeFormatOptions) => {
     try {
       return date.toLocaleTimeString(locales, options);
-    } catch (e) {
+    } catch {
       // Fallback for SES environments
       return date.toTimeString();
     }

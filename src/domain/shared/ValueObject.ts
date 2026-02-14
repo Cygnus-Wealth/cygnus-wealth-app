@@ -37,7 +37,7 @@ export abstract class ValueObject<T> {
   /**
    * Deep equality check for complex values
    */
-  private deepEquals(a: any, b: any): boolean {
+  private deepEquals(a: unknown, b: unknown): boolean {
     if (a === b) return true;
     
     if (a instanceof Date && b instanceof Date) {
@@ -51,13 +51,15 @@ export abstract class ValueObject<T> {
     if (typeof a !== typeof b) return false;
     
     if (typeof a === 'object') {
-      const keysA = Object.keys(a);
-      const keysB = Object.keys(b);
-      
+      const objA = a as Record<string, unknown>;
+      const objB = b as Record<string, unknown>;
+      const keysA = Object.keys(objA);
+      const keysB = Object.keys(objB);
+
       if (keysA.length !== keysB.length) return false;
-      
-      return keysA.every(key => 
-        keysB.includes(key) && this.deepEquals(a[key], b[key])
+
+      return keysA.every(key =>
+        keysB.includes(key) && this.deepEquals(objA[key], objB[key])
       );
     }
     
@@ -114,7 +116,7 @@ export abstract class ValueObject<T> {
   /**
    * Generate hash code for any value
    */
-  private generateHashCode(value: any): string {
+  private generateHashCode(value: unknown): string {
     if (value === null || value === undefined) {
       return 'null';
     }
@@ -136,9 +138,10 @@ export abstract class ValueObject<T> {
     }
 
     if (typeof value === 'object') {
-      const keys = Object.keys(value).sort();
-      const hashParts = keys.map(key => 
-        `${key}:${this.generateHashCode(value[key])}`
+      const obj = value as Record<string, unknown>;
+      const keys = Object.keys(obj).sort();
+      const hashParts = keys.map(key =>
+        `${key}:${this.generateHashCode(obj[key])}`
       );
       return this.stringHash(hashParts.join('|'));
     }

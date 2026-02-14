@@ -25,7 +25,7 @@ describe('MultiWalletConnect', () => {
         on: vi.fn(),
         removeListener: vi.fn()
       }
-    } as any;
+    } as unknown as typeof globalThis.window;
   });
 
   describe('Wallet Detection', () => {
@@ -34,13 +34,14 @@ describe('MultiWalletConnect', () => {
     });
 
     it('should detect multiple providers', () => {
-      (window.ethereum as any).providers = [
-        { isMetaMask: true },
-        { isRabby: true }
+      const eth = window.ethereum as EthereumProvider;
+      eth.providers = [
+        { isMetaMask: true, request: vi.fn(), on: vi.fn(), removeListener: vi.fn() } as unknown as EthereumProvider,
+        { isRabby: true, request: vi.fn(), on: vi.fn(), removeListener: vi.fn() } as unknown as EthereumProvider
       ];
 
-      const hasMetaMask = (window.ethereum as any).providers.some((p: any) => p.isMetaMask);
-      const hasRabby = (window.ethereum as any).providers.some((p: any) => p.isRabby);
+      const hasMetaMask = eth.providers!.some((p: EthereumProvider) => p.isMetaMask);
+      const hasRabby = eth.providers!.some((p: EthereumProvider) => p.isRabby);
 
       expect(hasMetaMask).toBe(true);
       expect(hasRabby).toBe(true);
@@ -57,8 +58,8 @@ describe('MultiWalletConnect', () => {
         '0x5678901234567890123456789012345678901234'
       ];
 
-      (window.ethereum!.request as any).mockResolvedValueOnce(mockAccounts);
-      
+      (window.ethereum!.request as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockAccounts);
+
       const accounts = await window.ethereum!.request({ method: 'eth_requestAccounts' });
       
       expect(accounts).toEqual(mockAccounts);
@@ -105,8 +106,8 @@ describe('MultiWalletConnect', () => {
     it('should handle wallet_switchEthereumChain', async () => {
       const chainId = '0x89'; // Polygon
       
-      (window.ethereum!.request as any).mockResolvedValueOnce(null);
-      
+      (window.ethereum!.request as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+
       await window.ethereum!.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId }]
@@ -120,15 +121,15 @@ describe('MultiWalletConnect', () => {
 
     it('should handle chain not configured error', async () => {
       const error = { code: 4902, message: 'Chain not configured' };
-      (window.ethereum!.request as any).mockRejectedValueOnce(error);
+      (window.ethereum!.request as ReturnType<typeof vi.fn>).mockRejectedValueOnce(error);
       
       try {
         await window.ethereum!.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: '0x89' }]
         });
-      } catch (e: any) {
-        expect(e.code).toBe(4902);
+      } catch (e: unknown) {
+        expect((e as { code: number }).code).toBe(4902);
       }
     });
   });

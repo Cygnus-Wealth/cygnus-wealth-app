@@ -7,17 +7,17 @@ declare global {
     selectedAddress?: string | null;
     chainId?: string | null;
     networkVersion?: string | null;
-    _metamask?: any;
+    _metamask?: Record<string, unknown>;
 
     request: (args: {
       method: string;
-      params?: any[];
-    }) => Promise<any>;
+      params?: unknown[];
+    }) => Promise<unknown>;
 
-    on?: (event: string, handler: (...args: any[]) => void) => void;
-    removeListener?: (event: string, handler: (...args: any[]) => void) => void;
-    send?: (method: string, params?: any[]) => Promise<any>;
-    sendAsync?: (request: any, callback: (error: any, response: any) => void) => void;
+    on?: (event: string, handler: (...args: unknown[]) => void) => void;
+    removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
+    send?: (method: string, params?: unknown[]) => Promise<unknown>;
+    sendAsync?: (request: unknown, callback: (error: unknown, response: unknown) => void) => void;
     enable?: () => Promise<string[]>;
 
     providers?: EthereumProvider[];
@@ -25,10 +25,10 @@ declare global {
 
   interface Window {
     ethereum?: EthereumProvider;
-    solana?: any;
-    suiet?: any;
-    sui?: any;
-    __walletManager?: any;
+    solana?: Record<string, unknown>;
+    suiet?: Record<string, unknown>;
+    sui?: Record<string, unknown>;
+    __walletManager?: Record<string, unknown>;
   }
 }
 

@@ -284,7 +284,7 @@ export const createBalanceSlice: StateCreator<
       const newBalances = new Map(state.balances);
       const newStates = new Map(state.balanceLoadingStates);
 
-      for (const [_id, balance] of newBalances) {
+      for (const balance of newBalances.values()) {
         if (accountIds.includes(balance.getAccountId())) {
           balance.markStale('balance');
           newStates.set(balance.getAccountId(), LoadingStatus.STALE);
@@ -303,7 +303,7 @@ export const createBalanceSlice: StateCreator<
       const newBalances = new Map(state.balances);
       const newStates = new Map(state.priceLoadingStates);
 
-      for (const [_id, balance] of newBalances) {
+      for (const balance of newBalances.values()) {
         if (symbols.includes(balance.getAssetSymbol())) {
           balance.markStale('price');
           newStates.set(balance.getAssetSymbol(), LoadingStatus.STALE);

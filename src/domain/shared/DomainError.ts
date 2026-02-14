@@ -8,13 +8,13 @@
 
 export abstract class DomainError extends Error {
   public readonly code: string;
-  public readonly details?: Record<string, any>;
+  public readonly details?: Record<string, unknown>;
   public readonly timestamp: Date;
 
   protected constructor(
     message: string,
     code: string,
-    details?: Record<string, any>
+    details?: Record<string, unknown>
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -31,7 +31,7 @@ export abstract class DomainError extends Error {
   /**
    * Create a serializable representation of the error
    */
-  public toJSON(): Record<string, any> {
+  public toJSON(): Record<string, unknown> {
     return {
       name: this.name,
       message: this.message,
@@ -73,7 +73,7 @@ export abstract class DomainError extends Error {
  * Validation Error - for business rule violations
  */
 export class ValidationError extends DomainError {
-  constructor(message: string, field?: string, value?: any) {
+  constructor(message: string, field?: string, value?: unknown) {
     super(
       message,
       'VALIDATION_ERROR',
@@ -97,7 +97,7 @@ export class ValidationError extends DomainError {
  * Business Rule Violation Error
  */
 export class BusinessRuleViolationError extends DomainError {
-  constructor(rule: string, message: string, context?: Record<string, any>) {
+  constructor(rule: string, message: string, context?: Record<string, unknown>) {
     super(
       message,
       'BUSINESS_RULE_VIOLATION',
@@ -140,7 +140,7 @@ export class NotFoundError extends DomainError {
  * Configuration Error - for system configuration issues
  */
 export class ConfigurationError extends DomainError {
-  constructor(setting: string, message: string, currentValue?: any) {
+  constructor(setting: string, message: string, currentValue?: unknown) {
     super(
       message,
       'CONFIGURATION_ERROR',
@@ -187,13 +187,13 @@ export class ExternalServiceError extends DomainError {
   }
 
   public isRetryable(): boolean {
-    const statusCode = this.details?.statusCode;
+    const statusCode = this.details?.statusCode as number | undefined;
     // Retry on 5xx errors and timeouts, but not on 4xx client errors
     return !statusCode || statusCode >= 500 || statusCode === 408;
   }
 
   public getSeverity(): 'low' | 'medium' | 'high' | 'critical' {
-    const statusCode = this.details?.statusCode;
+    const statusCode = this.details?.statusCode as number | undefined;
     if (statusCode && statusCode >= 500) return 'high';
     return 'medium';
   }
@@ -301,7 +301,7 @@ export class TimeoutError extends DomainError {
  * Generic Service Error - for general service-level errors
  */
 export class ServiceError extends DomainError {
-  constructor(code: string, message: string, details?: Record<string, any>) {
+  constructor(code: string, message: string, details?: Record<string, unknown>) {
     super(message, code, details);
   }
 
@@ -355,14 +355,14 @@ export class AggregateError extends DomainError {
   /**
    * Get all errors of a specific type
    */
-  public getErrorsOfType<T extends DomainError>(errorClass: new (...args: any[]) => T): T[] {
+  public getErrorsOfType<T extends DomainError>(errorClass: new (...args: unknown[]) => T): T[] {
     return this.errors.filter(e => e instanceof errorClass) as T[];
   }
 
   /**
    * Check if the aggregate contains a specific error type
    */
-  public hasErrorType<T extends DomainError>(errorClass: new (...args: any[]) => T): boolean {
+  public hasErrorType<T extends DomainError>(errorClass: new (...args: unknown[]) => T): boolean {
     return this.errors.some(e => e instanceof errorClass);
   }
 }

@@ -52,8 +52,9 @@ export class Success<T, E = DomainError> {
   /**
    * Map the error (no-op for Success)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public mapError<F>(_fn: (error: E) => F): Result<T, F> {
-    return this as any;
+    return this as unknown as Result<T, F>;
   }
 
   /**
@@ -66,6 +67,7 @@ export class Success<T, E = DomainError> {
   /**
    * Get the value or return the default
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public unwrapOr(_defaultValue: T): T {
     return this._value;
   }
@@ -73,6 +75,7 @@ export class Success<T, E = DomainError> {
   /**
    * Get the value or compute it from the error
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public unwrapOrElse(_fn: (error: E) => T): T {
     return this._value;
   }
@@ -95,6 +98,7 @@ export class Success<T, E = DomainError> {
   /**
    * Execute a function if this is a failure (no-op for Success)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public ifFailure(_fn: (error: E) => void): Result<T, E> {
     return this;
   }
@@ -124,15 +128,17 @@ export class Failure<T, E = DomainError> {
   /**
    * Map the success value (no-op for Failure)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public map<U>(_fn: (value: T) => U): Result<U, E> {
-    return this as any;
+    return this as unknown as Result<U, E>;
   }
 
   /**
    * Flat map (no-op for Failure)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public flatMap<U>(_fn: (value: T) => Result<U, E>): Result<U, E> {
-    return this as any;
+    return this as unknown as Result<U, E>;
   }
 
   /**
@@ -180,6 +186,7 @@ export class Failure<T, E = DomainError> {
   /**
    * Execute a function if this is a success (no-op for Failure)
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public ifSuccess(_fn: (value: T) => void): Result<T, E> {
     return this;
   }
@@ -237,7 +244,7 @@ function all<T extends readonly unknown[], E = DomainError>(
   const values: unknown[] = [];
   for (const result of results) {
     if (result.isFailure) {
-      return result as any;
+      return result as unknown as Result<T, E>;
     }
     values.push(result.value);
   }
@@ -275,13 +282,13 @@ function traverse<T, U, E = DomainError>(
   const results: U[] = [];
   for (const value of values) {
     const result = fn(value);
-    if (result.isFailure) return result as any;
+    if (result.isFailure) return result as unknown as Result<U[], E>;
     results.push(result.value);
   }
   return success(results);
 }
 
-function isResult<T, E>(value: any): value is Result<T, E> {
+function isResult<T, E>(value: unknown): value is Result<T, E> {
   return value instanceof Success || value instanceof Failure;
 }
 

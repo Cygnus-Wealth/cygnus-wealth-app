@@ -52,7 +52,7 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
 }));
 
 // Mock fetch for ERC20 tokens
-global.fetch = vi.fn();
+global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('useAccountSync', () => {
   beforeEach(() => {
@@ -78,7 +78,7 @@ describe('useAccountSync', () => {
     });
 
     // Setup fetch mock for ERC20 tokens
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         tokens: [
@@ -222,8 +222,8 @@ describe('useAccountSync', () => {
   describe('Error Handling', () => {
     it('should handle fetch errors gracefully', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+
+      (global.fetch as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
 
       const account: Account = {
         id: 'account-1',
@@ -237,13 +237,13 @@ describe('useAccountSync', () => {
       useStore.setState({ accounts: [account] });
 
       renderHook(() => useAccountSync());
-      
+
       // Wait a bit for the effect to run
       await new Promise(resolve => setTimeout(resolve, 100));
 
       // Give time for async operations
       await new Promise(resolve => setTimeout(resolve, 200));
-      
+
       expect(consoleErrorSpy).toHaveBeenCalled();
 
       // Should still update last sync time on account
@@ -254,7 +254,7 @@ describe('useAccountSync', () => {
     });
 
     it('should handle invalid token data', async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           tokens: [

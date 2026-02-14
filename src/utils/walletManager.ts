@@ -12,7 +12,7 @@ export function getWalletManager(): WalletManager {
     walletManagerInstance = new WalletManager();
     
     // Store it globally for access from hooks
-    (window as any).__cygnusWalletManager = walletManagerInstance;
+    (window as unknown as Record<string, unknown>).__cygnusWalletManager = walletManagerInstance;
   }
   
   return walletManagerInstance;
@@ -24,5 +24,5 @@ export function getWalletManager(): WalletManager {
  */
 export function resetWalletManager(): void {
   walletManagerInstance = null;
-  delete (window as any).__cygnusWalletManager;
+  delete (window as unknown as Record<string, unknown>).__cygnusWalletManager;
 }

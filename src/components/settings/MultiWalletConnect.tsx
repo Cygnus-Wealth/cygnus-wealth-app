@@ -44,7 +44,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     type: 'evm',
     check: () => {
       if (eth()?.providers?.length) {
-        return eth()!.providers!.some((p: any) => p.isMetaMask) as boolean;
+        return eth()!.providers!.some((p: EthereumProvider) => p.isMetaMask) as boolean;
       }
       return eth()?.isMetaMask || false;
     }
@@ -56,7 +56,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     type: 'evm',
     check: () => {
       if (eth()?.providers?.length) {
-        return eth()!.providers!.some((p: any) => p.isRabby) as boolean;
+        return eth()!.providers!.some((p: EthereumProvider) => p.isRabby) as boolean;
       }
       return eth()?.isRabby || false;
     }
@@ -67,7 +67,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     type: 'evm',
     check: () => {
       if (eth()?.providers?.length) {
-        return eth()!.providers!.some((p: any) => p.isCoinbaseWallet) as boolean;
+        return eth()!.providers!.some((p: EthereumProvider) => p.isCoinbaseWallet) as boolean;
       }
       return eth()?.isCoinbaseWallet || false;
     }
@@ -77,9 +77,9 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     source: IntegrationSource.METAMASK, // Brave uses MetaMask-like interface
     type: 'evm',
     check: () => {
-      const eth = window.ethereum as any;
+      const eth = window.ethereum as EthereumProvider | undefined;
       if (eth?.providers?.length) {
-        return eth.providers.some((p: any) => p.isBraveWallet) as boolean;
+        return eth.providers.some((p: EthereumProvider) => p.isBraveWallet) as boolean;
       }
       return eth?.isBraveWallet || false;
     }
@@ -150,9 +150,10 @@ export default function MultiWalletConnect() {
       console.error('Connection error:', error);
       
       let message = 'Failed to connect wallet';
-      const errorCode = (error as any).code;
-      const errorMessage = (error as any).message?.toLowerCase() || '';
-      
+      const walletError = error as { code?: number; message?: string };
+      const errorCode = walletError.code;
+      const errorMessage = walletError.message?.toLowerCase() || '';
+
       if (errorCode === 4001) {
         message = 'You rejected the connection';
       } else if (errorCode === -32002) {
@@ -160,8 +161,8 @@ export default function MultiWalletConnect() {
       } else if (errorMessage.includes('unexpected error') || errorMessage.includes('selectextension')) {
         // Firefox-specific error when multiple wallets are installed
         message = `Please make sure ${wallet.name} is unlocked and try again. If you have multiple wallets installed, you may need to disable other wallet extensions temporarily.`;
-      } else if ((error as any).message) {
-        message = (error as any).message;
+      } else if (walletError.message) {
+        message = walletError.message;
       }
       
       toaster.create({
@@ -206,8 +207,9 @@ export default function MultiWalletConnect() {
     });
     
     // Store connection info for balance fetching
-    (window as any).__cygnusConnections = (window as any).__cygnusConnections || {};
-    (window as any).__cygnusConnections[walletId] = {
+    const win = window as unknown as Record<string, unknown>;
+    win.__cygnusConnections = (win.__cygnusConnections as Record<string, unknown>) || {};
+    (win.__cygnusConnections as Record<string, unknown>)[walletId] = {
       provider: window.solana,
       chains: ['Solana'],
       accounts: [publicKey],
@@ -266,7 +268,7 @@ export default function MultiWalletConnect() {
       });
       
       // Store the wallet manager instance for balance fetching
-      (window as any).__cygnusWalletManager = walletManager;
+      (window as unknown as Record<string, unknown>).__cygnusWalletManager = walletManager;
       
       toaster.create({
         title: 'Wallet Connected',
@@ -330,21 +332,21 @@ export default function MultiWalletConnect() {
   const handleEvmConnect = async (wallet: WalletProvider, walletId: string) => {
       // Connect to each configured chain
       const connectedChains: string[] = [];
-      let allAccountsArray: any[] = [];
+      let allAccountsArray: string[] = [];
       
       // Get the correct provider based on the wallet
-      let provider = window.ethereum;
-      const eth = window.ethereum as any;
+      let provider = window.ethereum as EthereumProvider | undefined;
+      const ethProvider = window.ethereum as EthereumProvider | undefined;
 
       // Handle multiple providers case (common in Firefox)
-      if (eth?.providers?.length) {
+      if (ethProvider?.providers?.length) {
         // Find the specific provider for this wallet
         if (wallet.name === 'MetaMask') {
-          provider = eth.providers.find((p: any) => p.isMetaMask && !p.isRabby && !p.isBraveWallet) || window.ethereum;
+          provider = ethProvider.providers.find((p: EthereumProvider) => p.isMetaMask && !p.isRabby && !p.isBraveWallet) || window.ethereum;
         } else if (wallet.name === 'Rabby') {
-          provider = eth.providers.find((p: any) => p.isRabby) || window.ethereum;
+          provider = ethProvider.providers.find((p: EthereumProvider) => p.isRabby) || window.ethereum;
         } else if (wallet.name === 'Brave Wallet') {
-          provider = eth.providers.find((p: any) => p.isBraveWallet) || window.ethereum;
+          provider = ethProvider.providers.find((p: EthereumProvider) => p.isBraveWallet) || window.ethereum;
         }
       }
 
@@ -354,12 +356,12 @@ export default function MultiWalletConnect() {
       
       // Request all accounts
       console.log(`Getting all accounts from ${wallet.name}...`);
-      const accounts = await provider.request({ method: 'eth_requestAccounts' });
-      
+      const accounts = await provider.request({ method: 'eth_requestAccounts' }) as string[];
+
       if (!accounts || accounts.length === 0) {
         throw new Error('No accounts found');
       }
-      
+
       allAccountsArray = accounts;
       console.log(`Found ${accounts.length} accounts from ${wallet.name}`);
       
@@ -386,10 +388,11 @@ export default function MultiWalletConnect() {
           });
           connectedChains.push(chain.name);
           console.log(`Chain ${chain.name} is configured`);
-        } catch (error: any) {
-          if (error.code === 4902) {
+        } catch (error) {
+          const chainError = error as { code?: number };
+          if (chainError.code === 4902) {
             console.log(`Chain ${chain.name} not configured`);
-          } else if (error.code === 4001) {
+          } else if (chainError.code === 4001) {
             console.log('User rejected chain switch');
             break;
           }
@@ -402,8 +405,10 @@ export default function MultiWalletConnect() {
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: currentChainId }]
         });
-      } catch {}
-      
+      } catch {
+        // intentionally empty - best effort chain switch back
+      }
+
       if (connectedChains.length === 0) {
         connectedChains.push('Ethereum'); // At least Ethereum should work
       }
@@ -411,15 +416,14 @@ export default function MultiWalletConnect() {
       console.log(`Connected to ${connectedChains.length} chains with ${allAccountsArray.length} accounts`);
       
       // Add each account as a separate entry in our store
-      allAccountsArray.forEach((account, index) => {
+      allAccountsArray.forEach((address, index) => {
         const accountId = `${walletId}-account-${index}`;
-        const address = account.address || account; // Handle both account objects and plain addresses
-        
+
         addAccount({
           id: accountId,
           type: 'wallet',
           platform: 'Multi-Chain EVM',
-          label: account.label || `${wallet.name} Account ${index + 1}`,
+          label: `${wallet.name} Account ${index + 1}`,
           address: address,
           status: 'connected',
           metadata: {
@@ -439,8 +443,9 @@ export default function MultiWalletConnect() {
       });
       
       // Store connection info globally for balance fetching
-      (window as any).__cygnusConnections = (window as any).__cygnusConnections || {};
-      (window as any).__cygnusConnections[walletId] = {
+      const winEvm = window as unknown as Record<string, unknown>;
+      winEvm.__cygnusConnections = (winEvm.__cygnusConnections as Record<string, unknown>) || {};
+      (winEvm.__cygnusConnections as Record<string, unknown>)[walletId] = {
         provider,
         chains: connectedChains,
         accounts: allAccountsArray

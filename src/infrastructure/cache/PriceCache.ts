@@ -294,32 +294,33 @@ export class PriceCache implements IPriceCache {
   /**
    * Serialize price for storage
    */
-  private serializePrice(price: Price): any {
+  private serializePrice(price: Price): unknown {
     return price.toJSON();
   }
 
   /**
    * Deserialize price from storage
    */
-  private deserializePrice(data: any): Price {
+  private deserializePrice(data: Record<string, unknown>): Price {
     // Reconstruct Price object from stored data
-    const priceData = {
-      ...data,
-      timestamp: new Date(data.timestamp)
-    };
-    
+    const amount = data.amount as number;
+    const currency = data.currency as string;
+    const provider = data.provider as string | undefined;
+    const confidence = data.confidence as number | undefined;
+    const timestamp = new Date(data.timestamp as string | number);
+
     // Use appropriate factory method based on source
     switch (data.source) {
       case 'live':
-        return Price.live(data.amount, data.currency, data.provider, data.confidence);
+        return Price.live(amount, currency, provider, confidence);
       case 'cached':
-        return Price.cached(data.amount, data.currency, priceData.timestamp, data.provider, data.confidence);
+        return Price.cached(amount, currency, timestamp, provider, confidence);
       case 'fallback':
-        return Price.fallback(data.amount, data.currency, priceData.timestamp, data.provider);
+        return Price.fallback(amount, currency, timestamp, provider);
       case 'manual':
-        return Price.manual(data.amount, data.currency);
+        return Price.manual(amount, currency);
       default:
-        return Price.cached(data.amount, data.currency, priceData.timestamp);
+        return Price.cached(amount, currency, timestamp);
     }
   }
 

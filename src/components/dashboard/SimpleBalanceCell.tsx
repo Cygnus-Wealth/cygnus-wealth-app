@@ -18,7 +18,6 @@ export interface SimpleBalanceCellProps {
 
 export const SimpleBalanceCell: React.FC<SimpleBalanceCellProps> = ({
   balance,
-  symbol: _symbol,
   isLoading = false,
   hasError = false,
   compact = false

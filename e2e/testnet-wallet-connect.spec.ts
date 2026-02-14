@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 /** Inject a mock ethereum provider that reports a testnet chain id */
 async function mockTestnetProvider(page: Page) {
   await page.addInitScript(() => {
-    (window as any).ethereum = {
+    (window as unknown as Record<string, unknown>).ethereum = {
       isMetaMask: true,
       request: async ({ method }: { method: string }) => {
         switch (method) {
