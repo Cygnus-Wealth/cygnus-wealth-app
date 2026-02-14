@@ -46,9 +46,9 @@ export function useEvmBalanceWithPublicRpc(
           symbol: chain.nativeCurrency.symbol,
           name: chain.nativeCurrency.name,
           decimals: chain.nativeCurrency.decimals,
-          chain: chain.name,
-          type: 'NATIVE',
-          address: '0x0000000000000000000000000000000000000000',
+          chain: chain.name as any,
+          type: 'NATIVE' as any,
+          contractAddress: '0x0000000000000000000000000000000000000000',
           metadata: {}
         },
         amount: balanceEth,

@@ -34,14 +34,14 @@ describe('MultiWalletConnect', () => {
     });
 
     it('should detect multiple providers', () => {
-      window.ethereum!.providers = [
+      (window.ethereum as any).providers = [
         { isMetaMask: true },
         { isRabby: true }
       ];
-      
-      const hasMetaMask = window.ethereum!.providers!.some((p: any) => p.isMetaMask);
-      const hasRabby = window.ethereum!.providers!.some((p: any) => p.isRabby);
-      
+
+      const hasMetaMask = (window.ethereum as any).providers.some((p: any) => p.isMetaMask);
+      const hasRabby = (window.ethereum as any).providers.some((p: any) => p.isRabby);
+
       expect(hasMetaMask).toBe(true);
       expect(hasRabby).toBe(true);
     });

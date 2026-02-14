@@ -6,12 +6,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { BalanceService, BalanceFetchRequest, IBalanceProvider, IBalanceCache } from '../BalanceService';
+import { BalanceService, type BalanceFetchRequest, type IBalanceProvider, type IBalanceCache } from '../BalanceService';
 import { AssetValue } from '../../asset/AssetValue';
 import { BalanceAggregate } from '../../asset/BalanceAggregate';
 import { Price } from '../../asset/Price';
 import { Result } from '../../shared/Result';
-import { DomainError, ServiceError } from '../../shared/DomainError';
+import { ServiceError } from '../../shared/DomainError';
 
 // Mock implementations
 class MockBalanceProvider implements IBalanceProvider {
@@ -112,7 +112,6 @@ describe('BalanceService', () => {
   describe('should handle provider failure scenarios', () => {
     it('Provider fails but stale cache is available', async () => {
       // Setup - no cache (null), so it will try provider
-      const mockBalance = AssetValue.fromString('10', 'ETH');
       mockCache.get.mockResolvedValue(null); // No cache
       mockProvider.fetchBalance.mockResolvedValue(
         Result.failure(new ServiceError('NETWORK_ERROR', 'Network timeout'))
@@ -187,7 +186,7 @@ describe('BalanceService', () => {
       mockProvider.fetchBalance.mockImplementation(() => {
         attemptCount++;
         if (attemptCount <= 2) {
-          return Promise.resolve(Result.failure(new DomainError('TEMPORARY_ERROR', 'Temporary failure')));
+          return Promise.resolve(Result.failure(new ServiceError('TEMPORARY_ERROR', 'Temporary failure')));
         }
         return Promise.resolve(Result.success(mockBalance));
       });

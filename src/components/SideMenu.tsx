@@ -51,8 +51,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
 
     return (
       <Button
-        as={Link}
-        to={item.path}
+        asChild
         variant="ghost"
         w="full"
         justifyContent={isCollapsed ? 'center' : 'flex-start'}
@@ -64,6 +63,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
         px={isCollapsed ? 2 : 4}
         position="relative"
       >
+        <Link to={item.path}>
         {isCollapsed ? (
           <>
             <Icon size={20} />
@@ -92,6 +92,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
             />
           </>
         )}
+        </Link>
       </Button>
     );
   };
@@ -144,8 +145,7 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                   {item.subItems.map((subItem) => (
                     <Button
                       key={subItem.id}
-                      as={Link}
-                      to={subItem.path}
+                      asChild
                       variant="ghost"
                       size="sm"
                       w="full"
@@ -157,7 +157,9 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                       }}
                       pl={8}
                     >
-                      {subItem.label}
+                      <Link to={subItem.path}>
+                        {subItem.label}
+                      </Link>
                     </Button>
                   ))}
                 </Stack>
@@ -224,12 +226,10 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                     return (
                       <Box key={item.id}>
                         <Button
-                          as={Link}
-                          to={item.path}
+                          asChild
                           variant="ghost"
                           w="full"
                           justifyContent="flex-start"
-                          leftIcon={<Icon size={20} />}
                           bg={active ? 'blue.50' : 'transparent'}
                           color={active ? 'blue.600' : 'gray.700'}
                           _hover={{
@@ -240,15 +240,17 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                           borderRadius="0"
                           onClick={() => !item.subItems && setIsOpen(false)}
                         >
-                          {item.label}
+                          <Link to={item.path}>
+                            <Icon size={20} />
+                            {item.label}
+                          </Link>
                         </Button>
                         {item.subItems && location.pathname.startsWith(item.path) && (
                           <Stack gap={0}>
                             {item.subItems.map((subItem) => (
                               <Button
                                 key={subItem.id}
-                                as={Link}
-                                to={subItem.path}
+                                asChild
                                 variant="ghost"
                                 w="full"
                                 justifyContent="flex-start"
@@ -263,7 +265,9 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
                                 fontSize="sm"
                                 onClick={() => setIsOpen(false)}
                               >
-                                {subItem.label}
+                                <Link to={subItem.path}>
+                                  {subItem.label}
+                                </Link>
                               </Button>
                             ))}
                           </Stack>

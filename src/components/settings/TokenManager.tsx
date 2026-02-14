@@ -5,14 +5,13 @@ import {
   Text,
   Input,
   IconButton,
-  Badge,
   Grid,
   Flex,
   Dialog,
   createToaster,
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { FiPlus, FiTrash2, FiSearch } from 'react-icons/fi';
+import { FiPlus, FiTrash2 } from 'react-icons/fi';
 import { useStore, type Token } from '../../store/useStore';
 import { isAddress } from 'viem';
 
@@ -133,10 +132,10 @@ export default function TokenManager({ accountId, platform }: TokenManagerProps)
           <Text fontSize="lg" fontWeight="semibold">Tracked Tokens</Text>
           <Button
             size="sm"
-            leftIcon={<FiPlus />}
             onClick={() => setIsAddingToken(true)}
             variant="outline"
           >
+            <FiPlus />
             Add Token
           </Button>
         </Flex>
@@ -162,12 +161,13 @@ export default function TokenManager({ accountId, platform }: TokenManagerProps)
                 </Box>
                 <IconButton
                   aria-label="Remove token"
-                  icon={<FiTrash2 />}
                   size="sm"
                   variant="ghost"
                   color="red.500"
                   onClick={() => removeToken(token.address)}
-                />
+                >
+                  <FiTrash2 />
+                </IconButton>
               </Flex>
             ))}
           </Stack>

@@ -8,8 +8,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { BalanceAggregate } from '../BalanceAggregate';
 import { AssetValue } from '../AssetValue';
-import { Price, PriceSource } from '../Price';
-import { AssetLoadingState, LoadingStatus } from '../AssetLoadingState';
+import { Price } from '../Price';
+import { LoadingStatus } from '../AssetLoadingState';
 import { ValidationError } from '../../shared/DomainError';
 
 describe('BalanceAggregate', () => {

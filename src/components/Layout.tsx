@@ -3,6 +3,7 @@ import { Box } from '@chakra-ui/react';
 import { Outlet } from 'react-router-dom';
 import SideMenu from './SideMenu';
 import TestnetBanner from './TestnetBanner';
+import EnvironmentIndicator from './EnvironmentIndicator';
 
 export default function Layout() {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -20,6 +21,7 @@ export default function Layout() {
       >
         <Outlet />
       </Box>
+      <EnvironmentIndicator />
     </Box>
   );
 }

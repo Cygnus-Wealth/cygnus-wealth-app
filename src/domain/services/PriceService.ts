@@ -5,7 +5,7 @@
  * Implements progressive loading, background refresh, and fallback strategies.
  */
 
-import { Price, PriceSource } from '../asset/Price';
+import { Price } from '../asset/Price';
 import { Result } from '../shared/Result';
 import { DomainError, ServiceError } from '../shared/DomainError';
 
@@ -55,9 +55,7 @@ export class PriceService {
   private readonly defaultCurrency = 'USD';
   private readonly defaultTTL = 10000; // 10 seconds
   private readonly staleTTL = 60000; // 1 minute
-  private readonly fallbackTTL = 300000; // 5 minutes
   private readonly batchSize = 50;
-  private readonly maxRetries = 3;
 
   constructor(cache?: IPriceCache) {
     this.cache = cache;

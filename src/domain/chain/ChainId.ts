@@ -303,9 +303,9 @@ export class ChainId extends ValueObject<SupportedChainType> {
   }
 
   /**
-   * Create a JSON representation
+   * Create a detailed JSON representation with chain info
    */
-  public toJSON(): {
+  public toDetailedJSON(): {
     chainType: SupportedChainType;
     name: string;
     symbol: string;

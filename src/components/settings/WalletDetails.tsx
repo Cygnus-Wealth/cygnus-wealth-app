@@ -59,13 +59,15 @@ export default function WalletDetails() {
         <Box>
           <Flex align="center" gap={4} mb={2}>
             <IconButton
-              as={Link}
-              to="/settings/connections"
+              asChild
               aria-label="Back to Connections"
-              icon={<FiArrowLeft />}
               variant="ghost"
               size="sm"
-            />
+            >
+              <Link to="/settings/connections">
+                <FiArrowLeft />
+              </Link>
+            </IconButton>
             <Heading as="h1" size="3xl">
               {decodedConnectionType} Details
             </Heading>

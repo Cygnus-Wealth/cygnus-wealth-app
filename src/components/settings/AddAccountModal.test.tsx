@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ChakraProvider, defaultSystem } from '@chakra-ui/react';
 import AddAccountModal from './AddAccountModal';
 import { useStore } from '../../store/useStore';
@@ -71,8 +71,8 @@ describe('AddAccountModal', () => {
     // Fill in invalid address
     const addressInput = screen.getByPlaceholderText('0x...');
     const nameInput = screen.getByPlaceholderText('e.g., Main Wallet');
-    const submitButton = screen.getByText('Add Account');
-    
+    screen.getByText('Add Account'); // submitButton - verified exists
+
     await act(async () => {
       fireEvent.change(nameInput, { target: { value: 'Test Wallet' } });
       fireEvent.change(addressInput, { target: { value: 'invalid-address' } });

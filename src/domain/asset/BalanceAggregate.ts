@@ -361,19 +361,6 @@ export class BalanceAggregate {
                        this._data.price.getTimestamp() > other._data.price.getTimestamp() ?
                        this._data.price : other._data.price;
 
-    // Combine loading states (use the worst case)
-    const balanceStatus = this._data.loadingState.getBalanceStatus() === 'error' ||
-                         other._data.loadingState.getBalanceStatus() === 'error' ? 'error' :
-                         this._data.loadingState.getBalanceStatus() === 'loading' ||
-                         other._data.loadingState.getBalanceStatus() === 'loading' ? 'loading' :
-                         'success';
-
-    const priceStatus = this._data.loadingState.getPriceStatus() === 'error' ||
-                       other._data.loadingState.getPriceStatus() === 'error' ? 'error' :
-                       this._data.loadingState.getPriceStatus() === 'loading' ||
-                       other._data.loadingState.getPriceStatus() === 'loading' ? 'loading' :
-                       'success';
-
     return new BalanceAggregate({
       id: `merged-${this._data.id}-${other._data.id}`,
       accountId: `merged-${this._data.accountId}-${other._data.accountId}`,

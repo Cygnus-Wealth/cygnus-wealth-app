@@ -13,8 +13,11 @@ export type Result<T, E = DomainError> = Success<T, E> | Failure<T, E>;
 export class Success<T, E = DomainError> {
   public readonly isSuccess = true;
   public readonly isFailure = false;
+  private readonly _value: T;
 
-  constructor(private readonly _value: T) {}
+  constructor(value: T) {
+    this._value = value;
+  }
 
   public get value(): T {
     return this._value;
@@ -49,7 +52,7 @@ export class Success<T, E = DomainError> {
   /**
    * Map the error (no-op for Success)
    */
-  public mapError<F>(fn: (error: E) => F): Result<T, F> {
+  public mapError<F>(_fn: (error: E) => F): Result<T, F> {
     return this as any;
   }
 
@@ -63,14 +66,14 @@ export class Success<T, E = DomainError> {
   /**
    * Get the value or return the default
    */
-  public unwrapOr(defaultValue: T): T {
+  public unwrapOr(_defaultValue: T): T {
     return this._value;
   }
 
   /**
    * Get the value or compute it from the error
    */
-  public unwrapOrElse(fn: (error: E) => T): T {
+  public unwrapOrElse(_fn: (error: E) => T): T {
     return this._value;
   }
 
@@ -92,7 +95,7 @@ export class Success<T, E = DomainError> {
   /**
    * Execute a function if this is a failure (no-op for Success)
    */
-  public ifFailure(fn: (error: E) => void): Result<T, E> {
+  public ifFailure(_fn: (error: E) => void): Result<T, E> {
     return this;
   }
 
@@ -104,8 +107,11 @@ export class Success<T, E = DomainError> {
 export class Failure<T, E = DomainError> {
   public readonly isSuccess = false;
   public readonly isFailure = true;
+  private readonly _error: E;
 
-  constructor(private readonly _error: E) {}
+  constructor(error: E) {
+    this._error = error;
+  }
 
   public get value(): T {
     throw new Error('Cannot get value from Failure result');
@@ -118,14 +124,14 @@ export class Failure<T, E = DomainError> {
   /**
    * Map the success value (no-op for Failure)
    */
-  public map<U>(fn: (value: T) => U): Result<U, E> {
+  public map<U>(_fn: (value: T) => U): Result<U, E> {
     return this as any;
   }
 
   /**
    * Flat map (no-op for Failure)
    */
-  public flatMap<U>(fn: (value: T) => Result<U, E>): Result<U, E> {
+  public flatMap<U>(_fn: (value: T) => Result<U, E>): Result<U, E> {
     return this as any;
   }
 
@@ -174,7 +180,7 @@ export class Failure<T, E = DomainError> {
   /**
    * Execute a function if this is a success (no-op for Failure)
    */
-  public ifSuccess(fn: (value: T) => void): Result<T, E> {
+  public ifSuccess(_fn: (value: T) => void): Result<T, E> {
     return this;
   }
 
@@ -192,133 +198,102 @@ export class Failure<T, E = DomainError> {
 }
 
 /**
- * Result factory methods and utilities
+ * Result factory functions (namespace-free for erasableSyntaxOnly compatibility)
  */
-export namespace Result {
-  /**
-   * Create a success result
-   */
-  export function success<T, E = DomainError>(value: T): Result<T, E> {
-    return new Success<T, E>(value);
-  }
 
-  /**
-   * Create a failure result
-   */
-  export function failure<T, E = DomainError>(error: E): Result<T, E> {
-    return new Failure<T, E>(error);
-  }
+function success<T, E = DomainError>(value: T): Result<T, E> {
+  return new Success<T, E>(value);
+}
 
-  /**
-   * Create a result from a potentially throwing function
-   */
-  export function from<T, E = DomainError>(fn: () => T, errorMapper?: (error: unknown) => E): Result<T, E> {
-    try {
-      return success(fn());
-    } catch (error) {
-      const mappedError = errorMapper ? errorMapper(error) : error as E;
-      return failure(mappedError);
-    }
-  }
+function failure<T, E = DomainError>(error: E): Result<T, E> {
+  return new Failure<T, E>(error);
+}
 
-  /**
-   * Create a result from an async function
-   */
-  export async function fromAsync<T, E = DomainError>(
-    fn: () => Promise<T>, 
-    errorMapper?: (error: unknown) => E
-  ): Promise<Result<T, E>> {
-    try {
-      const value = await fn();
-      return success(value);
-    } catch (error) {
-      const mappedError = errorMapper ? errorMapper(error) : error as E;
-      return failure(mappedError);
-    }
-  }
-
-  /**
-   * Combine multiple results - succeeds only if all succeed
-   */
-  export function all<T extends readonly unknown[], E = DomainError>(
-    results: { [K in keyof T]: Result<T[K], E> }
-  ): Result<T, E> {
-    const values: any[] = [];
-    
-    for (const result of results) {
-      if (result.isFailure) {
-        return result as any;
-      }
-      values.push(result.value);
-    }
-    
-    return success(values as T);
-  }
-
-  /**
-   * Return the first success, or the last failure if all fail
-   */
-  export function any<T, E = DomainError>(results: Result<T, E>[]): Result<T, E> {
-    if (results.length === 0) {
-      return failure(new Error('No results provided') as E);
-    }
-
-    let lastFailure: Result<T, E> | null = null;
-    
-    for (const result of results) {
-      if (result.isSuccess) {
-        return result;
-      }
-      lastFailure = result;
-    }
-    
-    return lastFailure!;
-  }
-
-  /**
-   * Partition results into successes and failures
-   */
-  export function partition<T, E = DomainError>(
-    results: Result<T, E>[]
-  ): { successes: T[]; failures: E[] } {
-    const successes: T[] = [];
-    const failures: E[] = [];
-    
-    for (const result of results) {
-      if (result.isSuccess) {
-        successes.push(result.value);
-      } else {
-        failures.push(result.error);
-      }
-    }
-    
-    return { successes, failures };
-  }
-
-  /**
-   * Transform an array of values through a function that returns Results
-   */
-  export function traverse<T, U, E = DomainError>(
-    values: T[],
-    fn: (value: T) => Result<U, E>
-  ): Result<U[], E> {
-    const results: U[] = [];
-    
-    for (const value of values) {
-      const result = fn(value);
-      if (result.isFailure) {
-        return result as any;
-      }
-      results.push(result.value);
-    }
-    
-    return success(results);
-  }
-
-  /**
-   * Check if a value is a Result
-   */
-  export function isResult<T, E>(value: any): value is Result<T, E> {
-    return value instanceof Success || value instanceof Failure;
+function from<T, E = DomainError>(fn: () => T, errorMapper?: (error: unknown) => E): Result<T, E> {
+  try {
+    return success(fn());
+  } catch (error) {
+    const mappedError = errorMapper ? errorMapper(error) : error as E;
+    return failure(mappedError);
   }
 }
+
+async function fromAsync<T, E = DomainError>(
+  fn: () => Promise<T>,
+  errorMapper?: (error: unknown) => E,
+): Promise<Result<T, E>> {
+  try {
+    const value = await fn();
+    return success(value);
+  } catch (error) {
+    const mappedError = errorMapper ? errorMapper(error) : error as E;
+    return failure(mappedError);
+  }
+}
+
+function all<T extends readonly unknown[], E = DomainError>(
+  results: { [K in keyof T]: Result<T[K], E> },
+): Result<T, E> {
+  const values: unknown[] = [];
+  for (const result of results) {
+    if (result.isFailure) {
+      return result as any;
+    }
+    values.push(result.value);
+  }
+  return success(values as unknown as T);
+}
+
+function any<T, E = DomainError>(results: Result<T, E>[]): Result<T, E> {
+  if (results.length === 0) {
+    return failure(new Error('No results provided') as E);
+  }
+  let lastFailure: Result<T, E> | null = null;
+  for (const result of results) {
+    if (result.isSuccess) return result;
+    lastFailure = result;
+  }
+  return lastFailure!;
+}
+
+function partition<T, E = DomainError>(
+  results: Result<T, E>[],
+): { successes: T[]; failures: E[] } {
+  const successes: T[] = [];
+  const failures: E[] = [];
+  for (const result of results) {
+    if (result.isSuccess) successes.push(result.value);
+    else failures.push(result.error);
+  }
+  return { successes, failures };
+}
+
+function traverse<T, U, E = DomainError>(
+  values: T[],
+  fn: (value: T) => Result<U, E>,
+): Result<U[], E> {
+  const results: U[] = [];
+  for (const value of values) {
+    const result = fn(value);
+    if (result.isFailure) return result as any;
+    results.push(result.value);
+  }
+  return success(results);
+}
+
+function isResult<T, E>(value: any): value is Result<T, E> {
+  return value instanceof Success || value instanceof Failure;
+}
+
+/** Drop-in replacement for `Result.success()`, `Result.failure()`, etc. */
+export const Result = {
+  success,
+  failure,
+  from,
+  fromAsync,
+  all,
+  any,
+  partition,
+  traverse,
+  isResult,
+};

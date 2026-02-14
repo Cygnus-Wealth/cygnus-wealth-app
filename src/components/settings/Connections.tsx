@@ -12,9 +12,10 @@ import {
   Stat,
 } from '@chakra-ui/react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiKey, FiExternalLink } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiEdit2, FiTrash2, FiKey } from 'react-icons/fi';
 import { SiEthereum, SiSolana, SiBinance } from 'react-icons/si';
 import { useStore } from '../../store/useStore';
+import type { Account } from '../../store/useStore';
 import { useState, useMemo } from 'react';
 import AddAccountModal from './AddAccountModal';
 import TokenManager from './TokenManager';
@@ -33,7 +34,7 @@ const platformIcons: Record<string, React.ElementType> = {
 
 interface ConnectionGroup {
   connectionType: string;
-  accounts: typeof accounts[0][];
+  accounts: Account[];
   walletIds: Set<string>;
   totalWallets: number;
   totalAccounts: number;
@@ -202,13 +203,15 @@ export default function Connections() {
         <Box>
           <Flex align="center" gap={4} mb={2}>
             <IconButton
-              as={Link}
-              to="/settings"
+              asChild
               aria-label="Back to Settings"
-              icon={<FiArrowLeft />}
               variant="ghost"
               size="sm"
-            />
+            >
+              <Link to="/settings">
+                <FiArrowLeft />
+              </Link>
+            </IconButton>
             <Heading as="h1" size="3xl">
               Connections
             </Heading>
@@ -250,14 +253,14 @@ export default function Connections() {
 
         {/* Add Connection Actions */}
         <Box>
-          <Stack direction="row" spacing={4} wrap="wrap">
+          <Stack direction="row" gap={4} wrap="wrap">
             <MultiWalletConnect />
             <Button
-              leftIcon={<FiPlus />}
               variant="outline"
-              colorScheme="gray"
+              colorPalette="gray"
               onClick={handleAddAccount}
             >
+              <FiPlus />
               Add Manually
             </Button>
             <WalletDiagnostics />
@@ -450,7 +453,7 @@ export default function Connections() {
                         </Flex>
                         
                         {/* Actions */}
-                        <Stack direction="row" spacing={1}>
+                        <Stack direction="row" gap={1}>
                           <IconButton
                             aria-label="Edit connection"
                             variant="ghost"
@@ -471,7 +474,7 @@ export default function Connections() {
                       </Flex>
 
                       {/* Account Details */}
-                      <Stack spacing={2}>
+                      <Stack gap={2}>
                         {account.address && (
                           <Flex align="center" gap={2}>
                             <Text fontSize="sm" color="gray.600">

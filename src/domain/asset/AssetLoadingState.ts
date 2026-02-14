@@ -8,13 +8,15 @@
 import { ValueObject } from '../shared/ValueObject';
 import { ValidationError } from '../shared/DomainError';
 
-export enum LoadingStatus {
-  IDLE = 'idle',
-  LOADING = 'loading',
-  SUCCESS = 'success',
-  ERROR = 'error',
-  STALE = 'stale' // Data exists but is being refreshed
-}
+export const LoadingStatus = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  SUCCESS: 'success',
+  ERROR: 'error',
+  STALE: 'stale',
+} as const;
+
+export type LoadingStatus = (typeof LoadingStatus)[keyof typeof LoadingStatus];
 
 export interface AssetLoadingStateData {
   balanceStatus: LoadingStatus;

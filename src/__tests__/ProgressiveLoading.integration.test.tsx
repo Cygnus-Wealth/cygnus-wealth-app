@@ -6,14 +6,12 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import React from 'react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BalanceCell } from '../components/dashboard/BalanceCell';
 import { PriceIndicator } from '../components/dashboard/PriceIndicator';
 import { BalanceAggregate } from '../domain/asset/BalanceAggregate';
 import { AssetValue } from '../domain/asset/AssetValue';
 import { Price } from '../domain/asset/Price';
-import { AssetLoadingState, LoadingStatus } from '../domain/asset/AssetLoadingState';
 import { BalanceService } from '../domain/services/BalanceService';
 import { PriceService } from '../domain/services/PriceService';
 import { PriceCache } from '../infrastructure/cache/PriceCache';

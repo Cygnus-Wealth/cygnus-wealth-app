@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { useAccountSync } from './useAccountSync';
 import { useStore } from '../store/useStore';
 import type { Account } from '../store/useStore';

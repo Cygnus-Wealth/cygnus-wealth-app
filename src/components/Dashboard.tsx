@@ -161,8 +161,10 @@ export default function Dashboard() {
                   {connectedAccounts}
                 </Stat.ValueText>
                 <Stat.HelpText>
-                  <Button as={Link} to="/settings/connections" size="sm" variant="plain" colorScheme="blue">
-                    {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
+                  <Button asChild size="sm" variant="plain" colorPalette="blue">
+                    <Link to="/settings/connections">
+                      {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
+                    </Link>
                   </Button>
                 </Stat.HelpText>
               </Stat.Root>
@@ -331,13 +333,13 @@ export default function Dashboard() {
                             Add accounts to start tracking your portfolio
                           </Text>
                           <Button
-                            as={Link}
-                            to="/settings/connections"
-                            colorScheme="blue"
+                            asChild
+                            colorPalette="blue"
                           >
-                            <FiPlus />
-                          
-                            Go to Settings → Connections
+                            <Link to="/settings/connections">
+                              <FiPlus />
+                              Go to Settings → Connections
+                            </Link>
                           </Button>
                         </Stack>
                       </Table.Cell>

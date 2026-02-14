@@ -1,12 +1,12 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { AssetValuator } from '@cygnus-wealth/asset-valuator';
+// import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
 import type { Asset } from '../store/useStore';
 import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
-import type {
-  Chain
-} from '@cygnus-wealth/wallet-integration-system';
+// import {
+//   Chain
+// } from '@cygnus-wealth/wallet-integration-system';
 // Note: ConnectionManager doesn't exist in evm-integration
 // import {
 //   mapChainToChainId,
@@ -17,7 +17,7 @@ import { createPublicClient, http, type Address } from 'viem';
 import { mainnet, polygon, arbitrum, optimism, sepolia, polygonAmoy, arbitrumSepolia, optimismSepolia } from 'viem/chains';
 import { localhost } from 'viem/chains';
 
-const assetValuator = new AssetValuator();
+// const assetValuator = new AssetValuator();
 
 // Chain mapping for EVM chains
 interface ChainMapEntry {
@@ -53,13 +53,13 @@ function getChainMap(env: NetworkEnvironment): Record<string, ChainMapEntry> {
   }
 }
 
-// Chain enum mapping for wallet-integration-system compatibility
-const chainEnumMap: Record<string, Chain> = {
-  'Ethereum': Chain.ETHEREUM,
-  'Polygon': Chain.POLYGON,
-  'Arbitrum': Chain.ARBITRUM,
-  'Optimism': Chain.OPTIMISM
-};
+// Chain enum mapping for wallet-integration-system compatibility (currently unused)
+// const _chainEnumMap: Record<string, Chain> = {
+//   'Ethereum': Chain.ETHEREUM,
+//   'Polygon': Chain.POLYGON,
+//   'Arbitrum': Chain.ARBITRUM,
+//   'Optimism': Chain.OPTIMISM
+// };
 
 export function useAccountSync() {
   // Only subscribe to data values, NOT action functions
@@ -129,7 +129,7 @@ export function useAccountSync() {
           if (balance > 0n) {
             let priceData = { price: 0 };
             try {
-              priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
+              // priceData = await assetValuator.getPrice(chainConfig.symbol, 'USD');
               useStore.getState().updatePrice(chainConfig.symbol, priceData?.price || 0);
             } catch {
               console.warn(`Price not available for ${chainConfig.symbol}`);

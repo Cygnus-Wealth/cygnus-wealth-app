@@ -76,8 +76,7 @@ export default function Settings() {
             return (
               <Button
                 key={item.id}
-                as={Link}
-                to={item.path}
+                asChild
                 variant="outline"
                 h="auto"
                 p={6}
@@ -90,6 +89,7 @@ export default function Settings() {
                   borderColor: 'blue.300',
                 }}
               >
+                <Link to={item.path}>
                 <Stack direction="row" gap={4} align="flex-start" w="full">
                   <Box
                     p={3}
@@ -108,6 +108,7 @@ export default function Settings() {
                     </Text>
                   </Stack>
                 </Stack>
+                </Link>
               </Button>
             );
           })}

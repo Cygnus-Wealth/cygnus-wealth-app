@@ -7,7 +7,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PriceCache } from '../PriceCache';
-import { Price, PriceSource } from '../../../domain/asset/Price';
+import { Price } from '../../../domain/asset/Price';
 
 // Mock IndexedDB for testing
 const mockIndexedDB = {
@@ -314,7 +314,7 @@ describe('PriceCache', () => {
   describe('Error handling', () => {
     it('should handle IndexedDB errors gracefully', async () => {
       // Setup - Mock IndexedDB error
-      mockIDBOpenDBRequest.error = new Error('IndexedDB failed');
+      mockIDBOpenDBRequest.error = new Error('IndexedDB failed') as any;
       setTimeout(() => {
         if (mockIDBOpenDBRequest.onerror) mockIDBOpenDBRequest.onerror();
       }, 0);

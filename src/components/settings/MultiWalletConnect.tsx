@@ -26,13 +26,11 @@ interface WalletProvider {
   type: 'evm' | 'solana' | 'sui';
 }
 
-// Declare window interfaces for Solana and SUI
-declare global {
-  interface Window {
-    solana?: any;
-    suiet?: any;
-    sui?: any;
-  }
+// Window interfaces for Solana and SUI are declared in src/types/global.d.ts
+
+/** Cast window.ethereum to our full EthereumProvider type (the library ships a narrow one) */
+function eth(): EthereumProvider | undefined {
+  return window.ethereum as EthereumProvider | undefined;
 }
 
 const WALLET_PROVIDERS: WalletProvider[] = [
@@ -43,10 +41,10 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     source: IntegrationSource.METAMASK,
     type: 'evm',
     check: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isMetaMask) as boolean;
+      if (eth()?.providers?.length) {
+        return eth()!.providers!.some((p: any) => p.isMetaMask) as boolean;
       }
-      return window.ethereum?.isMetaMask || false;
+      return eth()?.isMetaMask || false;
     }
   },
   {
@@ -55,21 +53,21 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     source: IntegrationSource.RABBY,
     type: 'evm',
     check: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isRabby) as boolean;
+      if (eth()?.providers?.length) {
+        return eth()!.providers!.some((p: any) => p.isRabby) as boolean;
       }
-      return window.ethereum?.isRabby || false;
+      return eth()?.isRabby || false;
     }
   },
   {
     name: 'Coinbase Wallet',
-    source: IntegrationSource.COINBASE_WALLET,
+    source: IntegrationSource.COINBASE,
     type: 'evm',
     check: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isCoinbaseWallet) as boolean;
+      if (eth()?.providers?.length) {
+        return eth()!.providers!.some((p: any) => p.isCoinbaseWallet) as boolean;
       }
-      return window.ethereum?.isCoinbaseWallet || false;
+      return eth()?.isCoinbaseWallet || false;
     }
   },
   {
@@ -77,10 +75,11 @@ const WALLET_PROVIDERS: WalletProvider[] = [
     source: IntegrationSource.METAMASK, // Brave uses MetaMask-like interface
     type: 'evm',
     check: () => {
-      if (window.ethereum?.providers?.length) {
-        return window.ethereum.providers.some((p: any) => p.isBraveWallet) as boolean;
+      const eth = window.ethereum as any;
+      if (eth?.providers?.length) {
+        return eth.providers.some((p: any) => p.isBraveWallet) as boolean;
       }
-      return window.ethereum?.isBraveWallet || false;
+      return eth?.isBraveWallet || false;
     }
   },
   // Solana Wallets
@@ -259,8 +258,7 @@ export default function MultiWalletConnect() {
             walletId: walletId,
             connectionType: wallet.name,
             walletLabel: `${wallet.name} Wallet`,
-            useWalletManager: true, // Use WalletManager for balance fetching
-            walletManagerInstance: walletManager
+            useWalletManager: true,
           }
         });
       });
@@ -280,9 +278,9 @@ export default function MultiWalletConnect() {
       // Fallback to legacy method for Suiet
       if (wallet.source === IntegrationSource.SUIET && window.suiet) {
         const provider = window.suiet;
-        
+
         // Request permissions
-        await provider.requestPermissions();
+        await provider.requestPermissions?.();
         
         // Get accounts
         const accounts = await provider.getAccounts();
@@ -334,19 +332,20 @@ export default function MultiWalletConnect() {
       
       // Get the correct provider based on the wallet
       let provider = window.ethereum;
-      
+      const eth = window.ethereum as any;
+
       // Handle multiple providers case (common in Firefox)
-      if (window.ethereum?.providers?.length) {
+      if (eth?.providers?.length) {
         // Find the specific provider for this wallet
         if (wallet.name === 'MetaMask') {
-          provider = window.ethereum.providers.find((p: any) => p.isMetaMask && !p.isRabby && !p.isBraveWallet) || window.ethereum;
+          provider = eth.providers.find((p: any) => p.isMetaMask && !p.isRabby && !p.isBraveWallet) || window.ethereum;
         } else if (wallet.name === 'Rabby') {
-          provider = window.ethereum.providers.find((p: any) => p.isRabby) || window.ethereum;
+          provider = eth.providers.find((p: any) => p.isRabby) || window.ethereum;
         } else if (wallet.name === 'Brave Wallet') {
-          provider = window.ethereum.providers.find((p: any) => p.isBraveWallet) || window.ethereum;
+          provider = eth.providers.find((p: any) => p.isBraveWallet) || window.ethereum;
         }
       }
-      
+
       if (!provider) {
         throw new Error('No Ethereum provider found');
       }
@@ -459,8 +458,8 @@ export default function MultiWalletConnect() {
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button
-          colorScheme="purple"
-          isLoading={isConnecting}
+          colorPalette="purple"
+          loading={isConnecting}
           loadingText="Connecting..."
         >
           <FiExternalLink />
@@ -474,7 +473,7 @@ export default function MultiWalletConnect() {
             <Text fontSize="sm" fontWeight="semibold" color="gray.600" mb={2}>
               Select Wallet
             </Text>
-            <Stack spacing={1}>
+            <Stack gap={1}>
               {availableWallets.length === 0 ? (
                 <Text fontSize="sm" color="gray.500" p={2}>
                   No wallets detected. Please install a wallet extension.

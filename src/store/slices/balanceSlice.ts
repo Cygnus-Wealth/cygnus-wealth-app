@@ -5,9 +5,9 @@
  * Separates balance and price loading states for optimal performance.
  */
 
-import { StateCreator } from 'zustand';
+import type { StateCreator } from 'zustand';
 import { BalanceAggregate } from '../../domain/asset/BalanceAggregate';
-import { AssetLoadingState, LoadingStatus } from '../../domain/asset/AssetLoadingState';
+import { LoadingStatus } from '../../domain/asset/AssetLoadingState';
 
 export interface BalanceState {
   // Balance data
@@ -89,7 +89,7 @@ export const createBalanceSlice: StateCreator<
   priceErrors: new Map(),
 
   // Balance operations
-  setBalance: (accountId, balance) => {
+  setBalance: (_accountId, balance) => {
     set((state) => {
       const newBalances = new Map(state.balances);
       newBalances.set(balance.getId(), balance);
@@ -283,14 +283,14 @@ export const createBalanceSlice: StateCreator<
     set((state) => {
       const newBalances = new Map(state.balances);
       const newStates = new Map(state.balanceLoadingStates);
-      
-      for (const [id, balance] of newBalances) {
+
+      for (const [_id, balance] of newBalances) {
         if (accountIds.includes(balance.getAccountId())) {
           balance.markStale('balance');
           newStates.set(balance.getAccountId(), LoadingStatus.STALE);
         }
       }
-      
+
       return {
         balances: newBalances,
         balanceLoadingStates: newStates
@@ -302,14 +302,14 @@ export const createBalanceSlice: StateCreator<
     set((state) => {
       const newBalances = new Map(state.balances);
       const newStates = new Map(state.priceLoadingStates);
-      
-      for (const [id, balance] of newBalances) {
+
+      for (const [_id, balance] of newBalances) {
         if (symbols.includes(balance.getAssetSymbol())) {
           balance.markStale('price');
           newStates.set(balance.getAssetSymbol(), LoadingStatus.STALE);
         }
       }
-      
+
       return {
         balances: newBalances,
         priceLoadingStates: newStates

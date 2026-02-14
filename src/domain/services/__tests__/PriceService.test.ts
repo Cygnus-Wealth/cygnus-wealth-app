@@ -6,10 +6,10 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PriceService, PriceFetchRequest, IPriceProvider, IPriceCache } from '../PriceService';
+import { PriceService, type PriceFetchRequest, type IPriceProvider, type IPriceCache } from '../PriceService';
 import { Price, PriceSource } from '../../asset/Price';
 import { Result } from '../../shared/Result';
-import { DomainError, ServiceError } from '../../shared/DomainError';
+
 
 // Mock implementations
 class MockPriceProvider implements IPriceProvider {
@@ -174,13 +174,6 @@ describe('PriceService', () => {
       // Assertions for immediate result
       expect(immediateResult.isSuccess).toBe(true);
       expect(immediateResult.value.price.isStale()).toBe(true);
-
-      // Check that symbol was queued for refresh
-      const refreshQueue = (priceService as any).refreshQueue;
-      expect(refreshQueue.has('BTC:USD')).toBe(true);
-
-      // Mock provider for background refresh
-      provider1.fetchPrice.mockResolvedValue(Result.success(51000));
 
       // Check that symbol was queued for refresh
       const refreshQueue = (priceService as any).refreshQueue;
@@ -444,11 +437,11 @@ describe('PriceService', () => {
 
       // Verify that the fetch was triggered (though it may fail due to mock setup)
       // The warm cache method should attempt to fetch the prices
-      const fetchBatchSpy = vi.spyOn(priceService, 'fetchBatchPrices');
-      
+      vi.spyOn(priceService, 'fetchBatchPrices');
+
       // Call warm cache again to test the spy
       await priceService.warmCache(symbols, 'USD');
-      
+
       // We can't easily test the background operation, so let's verify the method was called
       expect(typeof priceService.warmCache).toBe('function');
     });

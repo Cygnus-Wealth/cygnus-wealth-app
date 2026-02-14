@@ -172,9 +172,9 @@ export const useProgressiveAssetLoading = (
     });
 
     try {
-      const balance = await Promise.race([
+      await Promise.race([
         loadBalance(asset),
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), balanceTimeout)
         )
       ]);

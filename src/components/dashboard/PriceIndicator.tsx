@@ -25,7 +25,7 @@ export interface PriceIndicatorProps {
 
 export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
   price,
-  symbol,
+  symbol: _symbol,
   isLoading = false,
   error,
   onRefresh,
@@ -74,7 +74,11 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
     return (
       <Flex align="center" gap={2}>
         <Box flex={1}>
-          <Progress size="xs" isIndeterminate colorScheme="blue" />
+          <Progress.Root size="xs" colorPalette="blue">
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
         </Box>
         <Text fontSize={sizeConfig.fontSize} color="gray.500">
           Loading price...
@@ -96,12 +100,13 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
         {onRefresh && (
           <IconButton
             aria-label="Retry price fetch"
-            icon={<FiRefreshCw />}
             size="xs"
             variant="ghost"
-            colorScheme="red"
+            colorPalette="red"
             onClick={onRefresh}
-          />
+          >
+            <FiRefreshCw />
+          </IconButton>
         )}
       </Flex>
     );
@@ -117,11 +122,12 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
         {onRefresh && (
           <IconButton
             aria-label="Fetch price"
-            icon={<FiRefreshCw />}
             size="xs"
             variant="ghost"
             onClick={onRefresh}
-          />
+          >
+            <FiRefreshCw />
+          </IconButton>
         )}
       </Flex>
     );
@@ -144,9 +150,9 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
       {/* Price trend */}
       {showTrend && priceChange !== null && (
         <Badge
-          colorScheme={priceChange > 0 ? 'green' : priceChange < 0 ? 'red' : 'gray'}
+          colorPalette={priceChange > 0 ? 'green' : priceChange < 0 ? 'red' : 'gray'}
           variant="subtle"
-          size={sizeConfig.badgeSize}
+          size={sizeConfig.badgeSize as 'xs' | 'sm' | 'md' | 'lg'}
         >
           {priceChange > 0 ? '↑' : priceChange < 0 ? '↓' : '→'}
           {Math.abs(priceChange).toFixed(2)}%
@@ -161,9 +167,9 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
             <Badge
-              colorScheme={metadata.qualityColor as any}
+              colorPalette={metadata.qualityColor as any}
               variant="subtle"
-              size={sizeConfig.badgeSize}
+              size={sizeConfig.badgeSize as 'xs' | 'sm' | 'md' | 'lg'}
               cursor="help"
             >
               {metadata.sourceText}
@@ -212,12 +218,13 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
       {onRefresh && (
         <IconButton
           aria-label="Refresh price"
-          icon={<FiRefreshCw />}
           size="xs"
           variant="ghost"
           onClick={onRefresh}
-          isDisabled={isLoading}
-        />
+          disabled={isLoading}
+        >
+          <FiRefreshCw />
+        </IconButton>
       )}
 
       {/* Live indicator for real-time prices */}
@@ -272,7 +279,7 @@ const LiveIndicator: React.FC<{ size: number }> = ({ size }) => {
       <Box position="relative">
         <Box
           as={FiActivity}
-          size={size}
+          boxSize={`${size}px`}
           color="green.500"
         />
         <Box

@@ -4,21 +4,22 @@ import { FiInfo } from 'react-icons/fi';
 export default function WalletDiagnostics() {
   const runDiagnostics = () => {
     console.log('=== Wallet Diagnostics ===');
-    
+
     // Check for window.ethereum
     console.log('window.ethereum exists:', !!window.ethereum);
-    
+
     if (window.ethereum) {
-      console.log('ethereum object:', window.ethereum);
-      console.log('isMetaMask:', window.ethereum.isMetaMask);
-      console.log('selectedAddress:', window.ethereum.selectedAddress);
-      console.log('chainId:', window.ethereum.chainId);
-      console.log('networkVersion:', window.ethereum.networkVersion);
-      
+      const eth = window.ethereum as any;
+      console.log('ethereum object:', eth);
+      console.log('isMetaMask:', eth.isMetaMask);
+      console.log('selectedAddress:', eth.selectedAddress);
+      console.log('chainId:', eth.chainId);
+      console.log('networkVersion:', eth.networkVersion);
+
       // Check for providers array (multiple wallets)
-      if (window.ethereum.providers && Array.isArray(window.ethereum.providers)) {
-        console.log('Multiple providers found:', window.ethereum.providers.length);
-        window.ethereum.providers.forEach((provider: any, index: number) => {
+      if (eth.providers && Array.isArray(eth.providers)) {
+        console.log('Multiple providers found:', eth.providers.length);
+        eth.providers.forEach((provider: any, index: number) => {
           console.log(`Provider ${index}:`, {
             isMetaMask: provider.isMetaMask,
             isCoinbaseWallet: provider.isCoinbaseWallet,
@@ -27,23 +28,23 @@ export default function WalletDiagnostics() {
             _metamask: !!provider._metamask
           });
         });
-      } else if (window.ethereum.providers) {
-        console.log('Providers property exists but is not an array:', typeof window.ethereum.providers);
+      } else if (eth.providers) {
+        console.log('Providers property exists but is not an array:', typeof eth.providers);
       }
-      
+
       // Try to access methods
       console.log('Available methods:');
       console.log('- request:', typeof window.ethereum.request);
-      console.log('- send:', typeof window.ethereum.send);
-      console.log('- sendAsync:', typeof window.ethereum.sendAsync);
-      console.log('- enable:', typeof window.ethereum.enable);
-      
+      console.log('- send:', typeof eth.send);
+      console.log('- sendAsync:', typeof eth.sendAsync);
+      console.log('- enable:', typeof eth.enable);
+
       // Check for other wallet indicators
       console.log('\nOther wallet checks:');
       console.log('window.solana:', !!window.solana);
-      console.log('window.ethereum.isCoinbaseWallet:', window.ethereum.isCoinbaseWallet);
-      console.log('window.ethereum.isRabby:', window.ethereum.isRabby);
-      console.log('window.ethereum.isBraveWallet:', window.ethereum.isBraveWallet);
+      console.log('window.ethereum.isCoinbaseWallet:', eth.isCoinbaseWallet);
+      console.log('window.ethereum.isRabby:', eth.isRabby);
+      console.log('window.ethereum.isBraveWallet:', eth.isBraveWallet);
       
       // Try a safe RPC call
       if (typeof window.ethereum.request === 'function') {
@@ -64,9 +65,9 @@ export default function WalletDiagnostics() {
   return (
     <Button
       variant="outline"
-      leftIcon={<FiInfo />}
       onClick={runDiagnostics}
     >
+      <FiInfo />
       Run Diagnostics
     </Button>
   );

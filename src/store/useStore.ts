@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Balance, NetworkEnvironment } from '@cygnus-wealth/data-models';
+import { detectEnvironment } from '../config/environment';
+
+/** Persistence key is namespaced by environment so data never leaks across networks */
+const detectedEnv = detectEnvironment();
+const STORAGE_KEY = `cygnus-wealth-storage-${detectedEnv}`;
 
 export interface Token {
   address: string;
@@ -119,7 +124,7 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       // Initial state
-      networkEnvironment: 'production' as NetworkEnvironment,
+      networkEnvironment: detectedEnv,
       setNetworkEnvironment: (env: NetworkEnvironment) => set({ networkEnvironment: env }),
 
       accounts: [],
@@ -237,7 +242,7 @@ export const useStore = create<AppState>()(
       setError: (error) => set({ error }),
     }),
     {
-      name: 'cygnus-wealth-storage',
+      name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         // Only persist accounts and user preferences

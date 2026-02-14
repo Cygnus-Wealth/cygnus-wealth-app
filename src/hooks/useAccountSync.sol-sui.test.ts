@@ -177,10 +177,10 @@ describe('useAccountSync - Solana & SUI', () => {
       ];
 
       // Reset store completely and set fresh state
-      useStore.setState({ 
-        accounts, 
-        assets: [], 
-        portfolio: { totalValue: 0, totalAssets: 0, chains: {} }
+      useStore.setState({
+        accounts,
+        assets: [],
+        portfolio: { totalValue: 0, totalAssets: 0, lastUpdated: null }
       });
 
       const { unmount } = renderHook(() => useAccountSync());
@@ -215,10 +215,10 @@ describe('useAccountSync - Solana & SUI', () => {
       };
 
       // Reset store completely and set fresh state
-      useStore.setState({ 
-        accounts: [suiAccount], 
-        assets: [], 
-        portfolio: { totalValue: 0, totalAssets: 0, chains: {} }
+      useStore.setState({
+        accounts: [suiAccount],
+        assets: [],
+        portfolio: { totalValue: 0, totalAssets: 0, lastUpdated: null }
       });
 
       const { unmount } = renderHook(() => useAccountSync());
@@ -322,7 +322,7 @@ describe('useAccountSync - Solana & SUI', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
-      console.log('Assets found:', assets.map(a => ({ symbol: a.symbol, platform: a.platform })));
+      console.log('Assets found:', assets.map(a => ({ symbol: a.symbol, chain: a.chain })));
       expect(assets).toHaveLength(2);
       
       // Check we have one of each asset type

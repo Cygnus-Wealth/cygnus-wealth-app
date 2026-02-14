@@ -8,12 +8,14 @@
 import { ValueObject } from '../shared/ValueObject';
 import { ValidationError } from '../shared/DomainError';
 
-export enum PriceSource {
-  LIVE = 'live',
-  CACHED = 'cached',
-  FALLBACK = 'fallback',
-  MANUAL = 'manual'
-}
+export const PriceSource = {
+  LIVE: 'live',
+  CACHED: 'cached',
+  FALLBACK: 'fallback',
+  MANUAL: 'manual',
+} as const;
+
+export type PriceSource = (typeof PriceSource)[keyof typeof PriceSource];
 
 export interface PriceData {
   amount: number;

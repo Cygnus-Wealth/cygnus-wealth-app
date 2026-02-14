@@ -313,12 +313,13 @@ export class SolanaChainService {
   public async checkHealth(): Promise<Result<boolean, ExternalServiceError | NetworkError | TimeoutError>> {
     const healthResult = await this.executeWithRetry(
       async () => {
-        const health = await this.connection.getHealth();
-        return health === 'ok';
+        // Use getVersion as a health check since getHealth() doesn't exist in all RPC implementations
+        await this.connection.getVersion();
+        return true;
       },
       'checkHealth'
     );
-    
+
     return healthResult;
   }
 

@@ -6,7 +6,7 @@
  */
 
 import { Price } from '../../domain/asset/Price';
-import { IPriceCache } from '../../domain/services/PriceService';
+import type { IPriceCache } from '../../domain/services/PriceService';
 
 interface CacheEntry {
   price: Price;
