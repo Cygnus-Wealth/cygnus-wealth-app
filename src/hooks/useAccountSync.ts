@@ -1,10 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { formatBalance } from '../utils/formatters';
 import type { Asset } from '../store/useStore';
-import { 
-  WalletManager, 
+import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
+import {
+  WalletManager,
   Chain
 } from '@cygnus-wealth/wallet-integration-system';
 // Note: ConnectionManager doesn't exist in evm-integration
@@ -14,7 +15,8 @@ import {
 //   mapTokenToAsset
 // } from '@cygnus-wealth/evm-integration';
 import { createPublicClient, http, type Address, erc20Abi } from 'viem';
-import { mainnet, polygon, arbitrum, optimism } from 'viem/chains';
+import { mainnet, polygon, arbitrum, optimism, sepolia, polygonAmoy, arbitrumSepolia, optimismSepolia } from 'viem/chains';
+import { localhost } from 'viem/chains';
 
 const assetValuator = new AssetValuator();
 
@@ -26,12 +28,31 @@ interface ChainMapEntry {
   name: string;
 }
 
-const chainMap: Record<string, ChainMapEntry> = {
+const productionChainMap: Record<string, ChainMapEntry> = {
   'Ethereum': { chain: mainnet, chainId: 1, symbol: 'ETH', name: 'Ethereum' },
   'Polygon': { chain: polygon, chainId: 137, symbol: 'MATIC', name: 'Polygon' },
   'Arbitrum': { chain: arbitrum, chainId: 42161, symbol: 'ETH', name: 'Arbitrum Ethereum' },
   'Optimism': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' }
 };
+
+const testnetChainMap: Record<string, ChainMapEntry> = {
+  'Ethereum': { chain: sepolia, chainId: 11155111, symbol: 'ETH', name: 'Sepolia ETH' },
+  'Polygon': { chain: polygonAmoy, chainId: 80002, symbol: 'MATIC', name: 'Polygon Amoy' },
+  'Arbitrum': { chain: arbitrumSepolia, chainId: 421614, symbol: 'ETH', name: 'Arbitrum Sepolia' },
+  'Optimism': { chain: optimismSepolia, chainId: 11155420, symbol: 'ETH', name: 'Optimism Sepolia' }
+};
+
+const localChainMap: Record<string, ChainMapEntry> = {
+  'Ethereum': { chain: localhost, chainId: 1337, symbol: 'ETH', name: 'Localhost' },
+};
+
+function getChainMap(env: NetworkEnvironment): Record<string, ChainMapEntry> {
+  switch (env) {
+    case 'testnet': return testnetChainMap;
+    case 'local': return localChainMap;
+    default: return productionChainMap;
+  }
+}
 
 // Chain enum mapping for wallet-integration-system compatibility
 const chainEnumMap: Record<string, Chain> = {
@@ -42,13 +63,16 @@ const chainEnumMap: Record<string, Chain> = {
 };
 
 export function useAccountSync() {
-  const { 
-    accounts, 
-    setAssets, 
-    calculateTotalValue, 
+  const {
+    accounts,
+    setAssets,
+    calculateTotalValue,
     setIsLoading,
-    updatePrice
+    updatePrice,
+    networkEnvironment
   } = useStore();
+
+  const chainMap = useMemo(() => getChainMap(networkEnvironment), [networkEnvironment]);
 
   // ConnectionManager not available - will create clients directly
 
@@ -62,7 +86,7 @@ export function useAccountSync() {
         transport: http()
       });
     }
-    
+
     return createPublicClient({
       chain: chainConfig.chain,
       transport: http()
@@ -219,7 +243,7 @@ export function useAccountSync() {
     };
 
     syncAccounts();
-  }, [walletAccounts, setAssets, calculateTotalValue, setIsLoading, updatePrice]);
+  }, [walletAccounts, setAssets, calculateTotalValue, setIsLoading, updatePrice, networkEnvironment, chainMap]);
 
   return {
     isLoading: useStore(state => state.isLoading),

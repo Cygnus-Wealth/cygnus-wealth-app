@@ -11,6 +11,7 @@ import {
 } from '@chakra-ui/react';
 import { Link, useLocation } from 'react-router-dom';
 import { FiMenu, FiHome, FiSettings, FiChevronLeft, FiChevronRight, FiX } from 'react-icons/fi';
+import EnvironmentSelector from './EnvironmentSelector';
 
 interface MenuItem {
   id: string;
@@ -164,6 +165,13 @@ export default function SideMenu({ onCollapseChange }: SideMenuProps = {}) {
             </Box>
           ))}
         </Stack>
+
+        {/* Environment Selector */}
+        {!isCollapsed && (
+          <Box p={3} borderTop="1px solid" borderColor="gray.200">
+            <EnvironmentSelector />
+          </Box>
+        )}
       </Flex>
     </Box>
   );

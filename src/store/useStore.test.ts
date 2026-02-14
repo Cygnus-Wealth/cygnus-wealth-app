@@ -15,6 +15,7 @@ describe('useStore', () => {
       },
       isLoading: false,
       error: null,
+      networkEnvironment: 'production',
     });
   });
 
@@ -346,6 +347,28 @@ describe('useStore', () => {
         expect(state.assets).toBeUndefined();
         expect(state.portfolio).toBeUndefined();
       }
+    });
+  });
+
+  describe('Network Environment', () => {
+    it('should default to production', () => {
+      expect(useStore.getState().networkEnvironment).toBe('production');
+    });
+
+    it('should set network environment to testnet', () => {
+      useStore.getState().setNetworkEnvironment('testnet');
+      expect(useStore.getState().networkEnvironment).toBe('testnet');
+    });
+
+    it('should set network environment to local', () => {
+      useStore.getState().setNetworkEnvironment('local');
+      expect(useStore.getState().networkEnvironment).toBe('local');
+    });
+
+    it('should switch back to production', () => {
+      useStore.getState().setNetworkEnvironment('testnet');
+      useStore.getState().setNetworkEnvironment('production');
+      expect(useStore.getState().networkEnvironment).toBe('production');
     });
   });
 });

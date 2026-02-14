@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Balance } from '@cygnus-wealth/data-models';
+import type { Balance, NetworkEnvironment } from '@cygnus-wealth/data-models';
 
 export interface Token {
   address: string;
@@ -60,6 +60,10 @@ export interface PortfolioState {
 }
 
 interface AppState {
+  // Network Environment
+  networkEnvironment: NetworkEnvironment;
+  setNetworkEnvironment: (env: NetworkEnvironment) => void;
+
   // Accounts
   accounts: Account[];
   addAccount: (account: Account) => void;
@@ -115,6 +119,9 @@ export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       // Initial state
+      networkEnvironment: 'production' as NetworkEnvironment,
+      setNetworkEnvironment: (env: NetworkEnvironment) => set({ networkEnvironment: env }),
+
       accounts: [],
       assets: [],
       assetLoadingStates: new Map(),
@@ -238,6 +245,7 @@ export const useStore = create<AppState>()(
           ...acc,
           apiKey: acc.apiKey, // In production, this should be encrypted
         })),
+        networkEnvironment: state.networkEnvironment,
         // Don't persist assets or prices as they should be fresh
       }),
     }
