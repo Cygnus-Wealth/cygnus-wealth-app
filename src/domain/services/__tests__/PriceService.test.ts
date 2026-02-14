@@ -41,11 +41,19 @@ describe('PriceService', () => {
 
   beforeEach(() => {
     mockCache = new MockPriceCache();
+    // Set default return values for cache methods to match IPriceCache interface
+    mockCache.get.mockResolvedValue(null);
+    mockCache.set.mockResolvedValue(undefined);
+    mockCache.getBatch.mockResolvedValue(new Map());
+    mockCache.setBatch.mockResolvedValue(undefined);
+    mockCache.invalidate.mockResolvedValue(undefined);
+    mockCache.getStats.mockResolvedValue({ hits: 0, misses: 0, size: 0 });
+
     priceService = new PriceService(mockCache);
-    
+
     provider1 = new MockPriceProvider('provider1', 1);
     provider2 = new MockPriceProvider('provider2', 2);
-    
+
     priceService.registerProvider(provider1);
     priceService.registerProvider(provider2);
   });
@@ -157,7 +165,7 @@ describe('PriceService', () => {
   describe('should handle background refresh queue', () => {
     it('Stale price triggers background refresh', async () => {
       // Setup
-      const stalePrice = Price.cached(50000, 'USD', new Date(Date.now() - 120000)); // 2 minutes old
+      const stalePrice = Price.fallback(50000, 'USD', new Date(Date.now() - 120000)); // 2 minutes old, TTL=5min so not expired but stale
       
       // Mock getting stale price from fallback
       (priceService as any).fallbackPrices.set('price:BTC:USD', stalePrice);
