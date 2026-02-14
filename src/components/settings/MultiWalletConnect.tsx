@@ -10,9 +10,11 @@ import {
 } from '@chakra-ui/react';
 import { FiExternalLink } from 'react-icons/fi';
 import { useStore } from '../../store/useStore';
-import { 
-  IntegrationSource 
+import {
+  IntegrationSource
 } from '@cygnus-wealth/wallet-integration-system';
+import phantomIcon from '../../assets/phantom-icon.svg';
+import slushIcon from '../../assets/slush-icon.svg';
 
 const toaster = createToaster({
   placement: 'top'
@@ -85,7 +87,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
   // Solana Wallets
   {
     name: 'Phantom',
-    icon: 'https://phantom.app/img/phantom-logo.svg',
+    icon: phantomIcon,
     source: IntegrationSource.PHANTOM,
     type: 'solana',
     check: () => window.solana?.isPhantom || false
@@ -93,7 +95,7 @@ const WALLET_PROVIDERS: WalletProvider[] = [
   // SUI Wallets
   {
     name: 'Slush',
-    icon: 'https://slush.dev/favicon.svg',
+    icon: slushIcon,
     source: IntegrationSource.SLUSH,
     type: 'sui',
     check: () => {
