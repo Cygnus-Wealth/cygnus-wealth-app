@@ -19,7 +19,7 @@
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",
     "@chakra-ui/react": "^3.22.0",
-    "@cygnus-wealth/asset-valuator": "^0.2.0",
+    "@cygnus-wealth/asset-valuator": "^0.3.0",
     "@cygnus-wealth/data-models": "^1.0.0",
     "@cygnus-wealth/evm-integration": "^1.0.0",
     "@cygnus-wealth/wallet-integration-system": "^1.0.0",

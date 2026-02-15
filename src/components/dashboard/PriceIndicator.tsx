@@ -25,7 +25,6 @@ export interface PriceIndicatorProps {
 
 export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
   price,
-  symbol: _symbol,
   isLoading = false,
   error,
   onRefresh,
@@ -167,7 +166,7 @@ export const PriceIndicator: React.FC<PriceIndicatorProps> = ({
         <Tooltip.Root>
           <Tooltip.Trigger asChild>
             <Badge
-              colorPalette={metadata.qualityColor as any}
+              colorPalette={metadata.qualityColor as 'green' | 'yellow' | 'red'}
               variant="subtle"
               size={sizeConfig.badgeSize as 'xs' | 'sm' | 'md' | 'lg'}
               cursor="help"

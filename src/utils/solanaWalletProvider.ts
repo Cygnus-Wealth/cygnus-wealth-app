@@ -7,11 +7,11 @@ interface SolanaPhantomProvider {
   isConnected?: boolean;
   connect?: () => Promise<{ publicKey: PublicKey }>;
   disconnect?: () => Promise<void>;
-  signTransaction?: (transaction: any) => Promise<any>;
+  signTransaction?: (transaction: unknown) => Promise<unknown>;
   signMessage?: (message: Uint8Array) => Promise<{ signature: Uint8Array }>;
-  request?: (method: string, params?: any) => Promise<any>;
-  on?: (event: string, callback: Function) => void;
-  off?: (event: string, callback: Function) => void;
+  request?: (method: string, params?: unknown) => Promise<unknown>;
+  on?: (event: string, callback: (...args: unknown[]) => unknown) => void;
+  off?: (event: string, callback: (...args: unknown[]) => unknown) => void;
 }
 
 // Window.solana type is declared in src/types/global.d.ts as `any`
@@ -60,7 +60,7 @@ export class SolanaWalletProvider {
   }
 
   // 4. Listen to account changes
-  onAccountChange(callback: (publicKey: any) => void) {
+  onAccountChange(callback: (publicKey: unknown) => void) {
     this.provider?.on?.('accountChanged', callback);
   }
 
@@ -80,14 +80,14 @@ export class SolanaWalletProvider {
   }
 
   // Cannot get token balances without RPC
-  async getTokenBalances(): Promise<any[]> {
+  async getTokenBalances(): Promise<unknown[]> {
     // This would require RPC calls:
     // const tokenAccounts = await connection.getParsedTokenAccountsByOwner(...)
     throw new Error('Token queries require RPC access');
   }
 
   // Cannot get transaction history without RPC
-  async getTransactionHistory(): Promise<any[]> {
+  async getTransactionHistory(): Promise<unknown[]> {
     // This would require RPC calls:
     // const signatures = await connection.getSignaturesForAddress(...)
     throw new Error('Transaction queries require RPC access');
@@ -104,7 +104,7 @@ export class SolanaWalletProvider {
       // Some wallets might support custom RPC methods
       if (!this.provider?.request) return null;
       const result = await this.provider.request('getBalance');
-      return result;
+      return result as number | null;
     } catch {
       return null;
     }

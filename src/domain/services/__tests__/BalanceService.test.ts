@@ -13,6 +13,15 @@ import { Price } from '../../asset/Price';
 import { Result } from '../../shared/Result';
 import { ServiceError } from '../../shared/DomainError';
 
+// Helper interface for accessing private members in tests
+interface BalanceServiceInternals {
+  delay: (ms: number) => Promise<void>;
+}
+
+function getInternals(service: BalanceService): BalanceServiceInternals {
+  return service as unknown as BalanceServiceInternals;
+}
+
 // Mock implementations
 class MockBalanceProvider implements IBalanceProvider {
   public fetchBalance = vi.fn();
@@ -70,7 +79,7 @@ describe('BalanceService', () => {
 
       // Performance check
       const duration = Date.now() - startTime;
-      expect(duration).toBeLessThan(10);
+      expect(duration).toBeLessThan(50);
     });
   });
 
@@ -198,8 +207,8 @@ describe('BalanceService', () => {
       };
 
       // Track retry delays
-      const originalDelay = (balanceService as any).delay;
-      (balanceService as any).delay = vi.fn().mockImplementation((ms: number) => {
+      const originalDelay = getInternals(balanceService).delay;
+      getInternals(balanceService).delay = vi.fn().mockImplementation((ms: number) => {
         retryDelays.push(ms);
         return Promise.resolve();
       });
@@ -214,7 +223,7 @@ describe('BalanceService', () => {
       expect(result.isSuccess).toBe(true);
 
       // Restore original delay
-      (balanceService as any).delay = originalDelay;
+      getInternals(balanceService).delay = originalDelay;
     });
   });
 

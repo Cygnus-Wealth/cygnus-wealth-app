@@ -260,7 +260,7 @@ export class ChainId extends ValueObject<SupportedChainType> {
    */
   public static getEvmChainTypes(): SupportedChainType[] {
     return Object.entries(ChainId.CHAIN_INFO_MAP)
-      .filter(([_, info]) => info.isEvm)
+      .filter(([, info]) => info.isEvm)
       .map(([chainType]) => chainType as SupportedChainType);
   }
 
@@ -269,7 +269,7 @@ export class ChainId extends ValueObject<SupportedChainType> {
    */
   public static getNonEvmChainTypes(): SupportedChainType[] {
     return Object.entries(ChainId.CHAIN_INFO_MAP)
-      .filter(([_, info]) => !info.isEvm)
+      .filter(([, info]) => !info.isEvm)
       .map(([chainType]) => chainType as SupportedChainType);
   }
 

@@ -98,12 +98,11 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
 describe('useAccountSync - Solana & SUI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.resetModules();
     vi.useRealTimers();
-    
+
     // Mock console.log to prevent debug output in tests
     vi.spyOn(console, 'log').mockImplementation(() => {});
-    
+
     // Reset store
     useStore.setState({
       accounts: [],
@@ -120,7 +119,6 @@ describe('useAccountSync - Solana & SUI', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
-    vi.restoreAllMocks();
   });
 
   describe('Solana Integration', () => {
@@ -244,12 +242,11 @@ describe('useAccountSync - Solana & SUI', () => {
 
     it.skip('should handle errors when fetching SUI balance', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
-      // Mock SuiWalletIntegration to throw error
-      const { SuiWalletIntegration } = await import('@cygnus-wealth/wallet-integration-system');
-      (SuiWalletIntegration as any).mockImplementation(() => ({
-        connect: vi.fn().mockResolvedValue(true),
-        getBalances: vi.fn().mockRejectedValue(new Error('Network error'))
+
+      // Mock SuiClient to throw error
+      const { SuiClient } = await import('@mysten/sui.js/client');
+      (SuiClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+        getBalance: vi.fn().mockRejectedValue(new Error('Network error'))
       }));
 
       const suiAccount: Account = {
@@ -264,26 +261,20 @@ describe('useAccountSync - Solana & SUI', () => {
       useStore.setState({ accounts: [suiAccount] });
 
       renderHook(() => useAccountSync());
-      
+
       await new Promise(resolve => setTimeout(resolve, 200));
 
       expect(consoleErrorSpy).toHaveBeenCalled();
       expect(useStore.getState().assets).toHaveLength(0);
-      
+
       consoleErrorSpy.mockRestore();
-      
+
       // Reset the mock back to successful response for subsequent tests
-      (SuiWalletIntegration as any).mockImplementation(() => ({
-        connect: vi.fn().mockResolvedValue(true),
-        getBalances: vi.fn().mockResolvedValue([{
-          amount: '2.5',
-          asset: {
-            symbol: 'SUI',
-            name: 'Sui',
-            address: 'native'
-          },
-          source: 'SUI_WALLET'
-        }])
+      (SuiClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+        getBalance: vi.fn().mockResolvedValue({
+          coinType: '0x2::sui::SUI',
+          totalBalance: '2500000000',
+        }),
       }));
     });
   });
@@ -293,7 +284,7 @@ describe('useAccountSync - Solana & SUI', () => {
     it.skip('should sync EVM, Solana, and SUI accounts together', async () => {
       // Reset SUI mock to return valid data
       const { SuiClient } = await import('@mysten/sui.js/client');
-      (SuiClient as any).mockImplementation(() => ({
+      (SuiClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
         getBalance: vi.fn().mockResolvedValue({
           totalBalance: '2500000000', // 2.5 SUI in atomic units
         }),
@@ -344,7 +335,7 @@ describe('useAccountSync - Solana & SUI', () => {
     it.skip('should calculate correct portfolio totals with SOL and SUI', async () => {
       // Reset SUI mock to return valid data
       const { SuiClient } = await import('@mysten/sui.js/client');
-      (SuiClient as any).mockImplementation(() => ({
+      (SuiClient as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
         getBalance: vi.fn().mockResolvedValue({
           totalBalance: '2500000000', // 2.5 SUI in atomic units
         }),

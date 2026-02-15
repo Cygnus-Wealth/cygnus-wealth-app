@@ -16,11 +16,11 @@ const mockIndexedDB = {
 };
 
 const mockIDBOpenDBRequest = {
-  result: null as any,
-  error: null,
-  onsuccess: null as any,
-  onerror: null as any,
-  onupgradeneeded: null as any,
+  result: null as unknown,
+  error: null as unknown,
+  onsuccess: null as ((this: IDBRequest, ev: Event) => unknown) | null,
+  onerror: null as ((this: IDBRequest, ev: Event) => unknown) | null,
+  onupgradeneeded: null as ((this: IDBOpenDBRequest, ev: IDBVersionChangeEvent) => unknown) | null,
 };
 
 const mockDB = {
@@ -34,8 +34,8 @@ const mockDB = {
 
 const mockTransaction = {
   objectStore: vi.fn(),
-  oncomplete: null as any,
-  onerror: null as any,
+  oncomplete: null as ((this: IDBTransaction, ev: Event) => unknown) | null,
+  onerror: null as ((this: IDBTransaction, ev: Event) => unknown) | null,
 };
 
 const mockObjectStore = {
@@ -48,10 +48,10 @@ const mockObjectStore = {
 };
 
 const mockRequest = {
-  result: null as any,
-  error: null,
-  onsuccess: null as any,
-  onerror: null as any,
+  result: null as unknown,
+  error: null as unknown,
+  onsuccess: null as ((this: IDBRequest, ev: Event) => unknown) | null,
+  onerror: null as ((this: IDBRequest, ev: Event) => unknown) | null,
 };
 
 // Mock the global indexedDB
@@ -62,7 +62,7 @@ Object.defineProperty(globalThis, 'indexedDB', {
 
 describe('PriceCache', () => {
   let cache: PriceCache;
-  let consoleWarnSpy: any;
+  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     // Reset mocks
@@ -182,6 +182,7 @@ describe('PriceCache', () => {
       await new Promise(resolve => setTimeout(resolve, 150));
 
       // Manually trigger cleanup (simulating the interval)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (cache as any).cleanup();
 
       // Assertions
@@ -281,7 +282,7 @@ describe('PriceCache', () => {
       const errors: Error[] = [];
 
       // Execute concurrent operations
-      const promises: Promise<any>[] = [];
+      const promises: Promise<unknown>[] = [];
       
       for (let i = 0; i < 100; i++) {
         // Mix set and get operations
@@ -314,9 +315,9 @@ describe('PriceCache', () => {
   describe('Error handling', () => {
     it('should handle IndexedDB errors gracefully', async () => {
       // Setup - Mock IndexedDB error
-      mockIDBOpenDBRequest.error = new Error('IndexedDB failed') as any;
+      mockIDBOpenDBRequest.error = new Error('IndexedDB failed');
       setTimeout(() => {
-        if (mockIDBOpenDBRequest.onerror) mockIDBOpenDBRequest.onerror();
+        if (mockIDBOpenDBRequest.onerror) mockIDBOpenDBRequest.onerror.call(mockIDBOpenDBRequest as unknown as IDBRequest, new Event('error'));
       }, 0);
 
       // Execute
@@ -338,7 +339,7 @@ describe('PriceCache', () => {
       
       try {
         // Try to mock missing IndexedDB if property is configurable
-        (globalThis as any).indexedDB = undefined;
+        (globalThis as unknown as Record<string, unknown>).indexedDB = undefined;
         
         // Execute
         const cacheWithoutIDB = new PriceCache();
@@ -360,7 +361,7 @@ describe('PriceCache', () => {
         cacheWithoutIDB.destroy();
       } finally {
         // Restore IndexedDB
-        (globalThis as any).indexedDB = originalIndexedDB;
+        (globalThis as unknown as Record<string, unknown>).indexedDB = originalIndexedDB;
       }
     });
   });

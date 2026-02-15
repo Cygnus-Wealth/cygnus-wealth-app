@@ -4,7 +4,7 @@ import { test, expect, Page } from '@playwright/test';
 async function mockEthereumProvider(page: Page) {
   await page.addInitScript(() => {
     // Create mock ethereum provider
-    (window as any).ethereum = {
+    (window as unknown as Record<string, unknown>).ethereum = {
       isMetaMask: true,
       request: async ({ method }: { method: string }) => {
         switch (method) {
@@ -67,7 +67,7 @@ test.describe('Wallet Connection Flow', () => {
   test('should show connection in summary stats', async ({ page }) => {
     // Mock a connected state
     await page.evaluate(() => {
-      const store = (window as any).__zustand_store;
+      const store = (window as unknown as Record<string, unknown>).__zustand_store;
       if (store) {
         store.setState({
           accounts: [{
@@ -97,7 +97,7 @@ test.describe('Wallet Connection Flow', () => {
   test('should navigate to wallet details', async ({ page }) => {
     // Mock connected wallet
     await page.evaluate(() => {
-      const store = (window as any).__zustand_store;
+      const store = (window as unknown as Record<string, unknown>).__zustand_store;
       if (store) {
         store.setState({
           accounts: [{
@@ -128,7 +128,7 @@ test.describe('Wallet Connection Flow', () => {
   test('should handle wallet disconnection', async ({ page }) => {
     // Mock connected wallet
     await page.evaluate(() => {
-      const store = (window as any).__zustand_store;
+      const store = (window as unknown as Record<string, unknown>).__zustand_store;
       if (store) {
         store.setState({
           accounts: [{
@@ -158,7 +158,7 @@ test.describe('Wallet Connection Flow', () => {
   test('should handle wallet deletion with confirmation', async ({ page }) => {
     // Mock connected wallet
     await page.evaluate(() => {
-      const store = (window as any).__zustand_store;
+      const store = (window as unknown as Record<string, unknown>).__zustand_store;
       if (store) {
         store.setState({
           accounts: [{
@@ -226,7 +226,7 @@ test.describe('Portfolio Display with Connected Wallet', () => {
       };
       
       // Store in window for Zustand to pick up
-      (window as any).__mockStoreState = mockState;
+      (window as unknown as Record<string, unknown>).__mockStoreState = mockState;
     });
     
     await page.goto('/');
@@ -246,7 +246,7 @@ test.describe('Portfolio Display with Connected Wallet', () => {
   test('should filter zero balance assets', async ({ page }) => {
     // Add zero balance asset to mock
     await page.evaluate(() => {
-      const store = (window as any).__zustand_store;
+      const store = (window as unknown as Record<string, unknown>).__zustand_store;
       if (store) {
         const currentAssets = store.getState().assets || [];
         store.setState({

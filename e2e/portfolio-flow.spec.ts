@@ -61,7 +61,8 @@ test.describe('Navigation', () => {
     await page.goto('/');
     
     // Check sidebar exists
-    const sidebar = page.locator('aside, [role="navigation"]').first();
+    // Verify sidebar exists
+    page.locator('aside, [role="navigation"]').first();
     
     // Navigate to Settings
     await page.click('text=Settings');

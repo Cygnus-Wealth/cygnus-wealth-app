@@ -34,7 +34,7 @@ test.describe('Testnet Portfolio Sync', () => {
 
     // Mock ethereum provider for testnet
     await page.addInitScript(() => {
-      (window as any).ethereum = {
+      (window as unknown as Record<string, unknown>).ethereum = {
         isMetaMask: true,
         request: async ({ method }: { method: string }) => {
           switch (method) {

@@ -9,7 +9,7 @@ export default function WalletDiagnostics() {
     console.log('window.ethereum exists:', !!window.ethereum);
 
     if (window.ethereum) {
-      const eth = window.ethereum as any;
+      const eth = window.ethereum as EthereumProvider;
       console.log('ethereum object:', eth);
       console.log('isMetaMask:', eth.isMetaMask);
       console.log('selectedAddress:', eth.selectedAddress);
@@ -19,7 +19,7 @@ export default function WalletDiagnostics() {
       // Check for providers array (multiple wallets)
       if (eth.providers && Array.isArray(eth.providers)) {
         console.log('Multiple providers found:', eth.providers.length);
-        eth.providers.forEach((provider: any, index: number) => {
+        eth.providers.forEach((provider: EthereumProvider, index: number) => {
           console.log(`Provider ${index}:`, {
             isMetaMask: provider.isMetaMask,
             isCoinbaseWallet: provider.isCoinbaseWallet,
@@ -51,7 +51,7 @@ export default function WalletDiagnostics() {
         console.log('\nTrying eth_chainId...');
         window.ethereum.request({ method: 'eth_chainId' })
           .then((chainId: string) => console.log('Current chain ID:', chainId))
-          .catch((error: any) => console.error('Error getting chain ID:', error));
+          .catch((error: unknown) => console.error('Error getting chain ID:', error));
       } else {
         console.log('Request method not available');
       }

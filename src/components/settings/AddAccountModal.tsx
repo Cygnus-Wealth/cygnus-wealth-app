@@ -8,7 +8,7 @@ import {
   createToaster,
 } from '@chakra-ui/react';
 import { useState } from 'react';
-import { Formik, Form, Field } from 'formik';
+import { Formik, Form, Field, type FieldProps } from 'formik';
 import * as yup from 'yup';
 import { useStore } from '../../store/useStore';
 
@@ -34,7 +34,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
   const { addAccount, accounts } = useStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (values: any) => {
+  const handleSubmit = async (values: { label: string; address: string; platform: string }) => {
     setIsSubmitting(true);
     
     try {
@@ -73,7 +73,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
       });
       
       onClose();
-    } catch (error) {
+    } catch {
       toaster.create({
         title: 'Error',
         description: 'Failed to add account',
@@ -109,7 +109,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
                 <Form>
                   <Stack gap={4}>
                     <Field name="label">
-                      {({ field }: any) => (
+                      {({ field }: FieldProps) => (
                         <Stack gap={2}>
                           <Text fontWeight="medium">Account Name</Text>
                           <Input
@@ -127,13 +127,13 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
                     </Field>
 
                     <Field name="platform">
-                      {({ field }: any) => (
+                      {({ field }: FieldProps) => (
                         <Stack gap={2}>
                           <Text fontWeight="medium">Network</Text>
                           <Box
                             as="select"
                             {...field}
-                            disabled={isSubmitting}
+                            aria-disabled={isSubmitting || undefined}
                             px={3}
                             py={2}
                             borderRadius="md"
@@ -157,7 +157,7 @@ export default function AddAccountModal({ isOpen, onClose }: AddAccountModalProp
                     </Field>
 
                     <Field name="address">
-                      {({ field }: any) => (
+                      {({ field }: FieldProps) => (
                         <Stack gap={2}>
                           <Text fontWeight="medium">Wallet Address</Text>
                           <Input

@@ -8,10 +8,10 @@ const localStorageMock = {
   removeItem: vi.fn(),
   clear: vi.fn(),
 };
-(global as any).localStorage = localStorageMock;
+(global as unknown as Record<string, unknown>).localStorage = localStorageMock;
 
 // Mock window.confirm
-(global as any).confirm = vi.fn(() => true);
+(global as unknown as Record<string, unknown>).confirm = vi.fn(() => true);
 
 // Mock IntersectionObserver
 global.IntersectionObserver = vi.fn().mockImplementation(() => ({
@@ -41,4 +41,4 @@ global.window = {
     on: vi.fn(),
     removeListener: vi.fn(),
   }
-} as any;
+} as unknown as typeof globalThis.window;

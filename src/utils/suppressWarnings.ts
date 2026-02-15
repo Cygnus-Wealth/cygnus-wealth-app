@@ -17,7 +17,7 @@ const warningsToSuppress = [
  * Call this early in your application initialization
  */
 export function initializeWarningSuppression() {
-  console.warn = function(...args: any[]) {
+  console.warn = function(...args: unknown[]) {
     const message = args[0]?.toString() || '';
     
     // Check if this warning should be suppressed

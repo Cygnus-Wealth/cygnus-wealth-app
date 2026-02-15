@@ -52,7 +52,7 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
 }));
 
 // Mock fetch for ERC20 tokens
-global.fetch = vi.fn();
+global.fetch = vi.fn() as unknown as typeof fetch;
 
 describe('useAccountSync', () => {
   beforeEach(() => {
@@ -78,7 +78,7 @@ describe('useAccountSync', () => {
     });
 
     // Setup fetch mock for ERC20 tokens
-    (global.fetch as any).mockResolvedValue({
+    (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
         tokens: [
@@ -218,7 +218,9 @@ describe('useAccountSync', () => {
 
   describe('Error Handling', () => {
     it('should handle fetch errors gracefully', async () => {
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      (global.fetch as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
 
       const account: Account = {
         id: 'account-1',
@@ -227,27 +229,43 @@ describe('useAccountSync', () => {
         label: 'Test Wallet',
         address: '0x1234',
         status: 'connected',
-        // No detectedChains — hook treats as unknown platform config
       };
 
       useStore.setState({ accounts: [account] });
 
       renderHook(() => useAccountSync());
 
-      // Wait for the effect to run
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait a bit for the effect to run
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Hook logs warning for unrecognized platform configuration
-      expect(consoleWarnSpy).toHaveBeenCalled();
+      // Give time for async operations
+      await new Promise(resolve => setTimeout(resolve, 200));
 
-      // Assets should be empty since no balances could be fetched
-      const assets = useStore.getState().assets;
-      expect(assets).toHaveLength(0);
+      expect(consoleErrorSpy).toHaveBeenCalled();
 
-      consoleWarnSpy.mockRestore();
+      // Should still update last sync time on account
+      const updatedAccount = useStore.getState().accounts[0];
+      expect(updatedAccount.lastSync).toBeTruthy();
+
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle invalid token data', async () => {
+      (global.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          tokens: [
+            {
+              tokenInfo: {
+                // Missing required fields
+                symbol: 'INVALID',
+              },
+              balance: 'not-a-number',
+            },
+          ],
+        }),
+      });
+
       const account: Account = {
         id: 'account-1',
         type: 'wallet',
@@ -264,11 +282,14 @@ describe('useAccountSync', () => {
 
       renderHook(() => useAccountSync());
 
-      // Wait for the effect to run
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Wait a bit for the effect to run
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Give time for async operations
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const assets = useStore.getState().assets;
-      // Should have ETH from native balance fetch via viem
+      // Should only have ETH, invalid token should be skipped
       expect(assets).toHaveLength(1);
       expect(assets[0].symbol).toBe('ETH');
     });

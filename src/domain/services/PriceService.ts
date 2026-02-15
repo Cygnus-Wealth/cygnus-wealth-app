@@ -95,12 +95,13 @@ export class PriceService {
         }
       }
 
-      // 2. Check fallback prices
+      // 2. Check fallback prices (return even if stale/expired, queue background refresh)
       const fallback = this.fallbackPrices.get(cacheKey);
-      if (fallback && !fallback.isExpired()) {
-        // Queue for background refresh
-        this.queueForRefresh(request.symbol, currency);
-        
+      if (fallback) {
+        if (fallback.isExpired() || fallback.isStale()) {
+          this.queueForRefresh(request.symbol, currency);
+        }
+
         return Result.success({
           price: fallback,
           fetchDuration: Date.now() - startTime
@@ -135,14 +136,6 @@ export class PriceService {
             fetchDuration: Date.now() - startTime
           });
         }
-      }
-
-      // 5. Return expired fallback if nothing else
-      if (fallback) {
-        return Result.success({
-          price: fallback.refresh(),
-          fetchDuration: Date.now() - startTime
-        });
       }
 
       return Result.failure(

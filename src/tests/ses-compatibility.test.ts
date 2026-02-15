@@ -8,15 +8,15 @@ describe('SES Compatibility', () => {
     });
     
     it('should detect SES environment with lockdown', () => {
-      (globalThis as any).lockdown = () => {};
+      (globalThis as Record<string, unknown>).lockdown = () => {};
       expect(isSESEnvironment()).toBe(true);
-      delete (globalThis as any).lockdown;
+      delete (globalThis as Record<string, unknown>).lockdown;
     });
     
     it('should detect SES environment with harden', () => {
-      (globalThis as any).harden = () => {};
+      (globalThis as Record<string, unknown>).harden = () => {};
       expect(isSESEnvironment()).toBe(true);
-      delete (globalThis as any).harden;
+      delete (globalThis as Record<string, unknown>).harden;
     });
   });
   

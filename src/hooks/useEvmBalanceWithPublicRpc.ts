@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPublicClient, http, formatEther, type Address } from 'viem';
 import { mainnet, polygon, arbitrum, optimism } from 'viem/chains';
 import type { Balance } from '@cygnus-wealth/data-models';
+import { Chain as DataChain, AssetType } from '@cygnus-wealth/data-models';
 import { getRpcUrl } from '../config/rpc';
 
 const chains = {
@@ -46,8 +47,8 @@ export function useEvmBalanceWithPublicRpc(
           symbol: chain.nativeCurrency.symbol,
           name: chain.nativeCurrency.name,
           decimals: chain.nativeCurrency.decimals,
-          chain: chain.name as any,
-          type: 'NATIVE' as any,
+          chain: chain.name as unknown as DataChain,
+          type: AssetType.CRYPTOCURRENCY,
           contractAddress: '0x0000000000000000000000000000000000000000',
           metadata: {}
         },

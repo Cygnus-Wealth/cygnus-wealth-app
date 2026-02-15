@@ -150,7 +150,7 @@ export class SolanaChainService {
     try {
       const publicKey = new PublicKey(publicKeyString);
       return Result.success(publicKey);
-    } catch (error) {
+    } catch {
       return Result.failure(new ValidationError(
         `Invalid Solana public key: ${publicKeyString}`,
         'publicKey',
@@ -341,7 +341,7 @@ export class SolanaChainService {
   /**
    * Get RPC version info
    */
-  public async getVersion(): Promise<Result<any, ExternalServiceError | NetworkError | TimeoutError>> {
+  public async getVersion(): Promise<Result<unknown, ExternalServiceError | NetworkError | TimeoutError>> {
     const versionResult = await this.executeWithRetry(
       async () => {
         const version = await this.connection.getVersion();
@@ -368,7 +368,7 @@ export class SolanaChainService {
       rpcConfigService.setActiveEndpoint('solana', url);
       this.connection = this.createConnection();
       return Result.success(undefined);
-    } catch (error) {
+    } catch {
       return Result.failure(new ValidationError(
         `Failed to switch to RPC endpoint: ${url}`,
         'rpcEndpoint',
