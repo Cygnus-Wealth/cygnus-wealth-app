@@ -23,6 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 
+# Test artifacts
+test-results/
+playwright-report/
+debug-screenshot.png
+simple-check.png
+
 # Gas Town (added by gt)
 .runtime/
 .claude/
