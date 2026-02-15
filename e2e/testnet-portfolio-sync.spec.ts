@@ -1,57 +1,12 @@
-import { test, expect, type Page } from '@playwright/test';
-
-/** Seed a test wallet into the store via localStorage */
-async function seedTestWallet(page: Page) {
-  await page.addInitScript(() => {
-    const storageKey = 'cygnus-wealth-storage-testnet';
-    const state = {
-      state: {
-        accounts: [
-          {
-            id: 'test-wallet-1',
-            type: 'wallet',
-            platform: 'Multi-Chain EVM',
-            label: 'Testnet Wallet',
-            address: '0xTestWallet0000000000000000000000000000001',
-            status: 'connected',
-            metadata: {
-              connectionType: 'MetaMask',
-              detectedChains: ['Ethereum'],
-            },
-          },
-        ],
-        networkEnvironment: 'testnet',
-      },
-      version: 0,
-    };
-    localStorage.setItem(storageKey, JSON.stringify(state));
-  });
-}
+import { test, expect } from '@playwright/test';
+import { seedTestWallet, mockTestnetProvider } from './fixtures';
 
 test.describe('Testnet Portfolio Sync', () => {
   test.beforeEach(async ({ page }) => {
     await seedTestWallet(page);
 
     // Mock ethereum provider for testnet
-    await page.addInitScript(() => {
-      (window as unknown as Record<string, unknown>).ethereum = {
-        isMetaMask: true,
-        request: async ({ method }: { method: string }) => {
-          switch (method) {
-            case 'eth_requestAccounts':
-              return ['0xTestWallet0000000000000000000000000000001'];
-            case 'eth_chainId':
-              return '0xaa36a7'; // Sepolia
-            case 'eth_getBalance':
-              return '0xde0b6b3a7640000'; // 1 ETH
-            default:
-              return null;
-          }
-        },
-        on: () => {},
-        removeListener: () => {},
-      };
-    });
+    await mockTestnetProvider(page);
 
     await page.goto('/');
   });

@@ -1,29 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-
-/** Inject a mock ethereum provider that reports a testnet chain id */
-async function mockTestnetProvider(page: Page) {
-  await page.addInitScript(() => {
-    (window as unknown as Record<string, unknown>).ethereum = {
-      isMetaMask: true,
-      request: async ({ method }: { method: string }) => {
-        switch (method) {
-          case 'eth_requestAccounts':
-            return ['0xTestWallet0000000000000000000000000000001'];
-          case 'eth_chainId':
-            return '0xaa36a7'; // Sepolia (11155111)
-          case 'eth_getBalance':
-            return '0xde0b6b3a7640000'; // 1 ETH
-          case 'wallet_switchEthereumChain':
-            return null;
-          default:
-            throw new Error(`Unhandled method: ${method}`);
-        }
-      },
-      on: () => {},
-      removeListener: () => {},
-    };
-  });
-}
+import { test, expect } from '@playwright/test';
+import { mockTestnetProvider } from './fixtures';
 
 test.describe('Testnet Wallet Connect', () => {
   test.beforeEach(async ({ page }) => {
@@ -32,7 +8,7 @@ test.describe('Testnet Wallet Connect', () => {
   });
 
   test('should connect wallet on testnet', async ({ page }) => {
-    const connectButton = page.locator('button:has-text("Connect Wallet")');
+    const connectButton = page.locator('button:has-text("Multi-Chain Connect")');
     await expect(connectButton).toBeVisible();
     await connectButton.click();
 
@@ -43,7 +19,7 @@ test.describe('Testnet Wallet Connect', () => {
 
     // Should eventually show a connected state
     await expect(
-      page.locator('text=/connected|Wallet Connected/i'),
+      page.locator('text=/connected|Wallet Connected/i').first(),
     ).toBeVisible({ timeout: 15000 });
   });
 
