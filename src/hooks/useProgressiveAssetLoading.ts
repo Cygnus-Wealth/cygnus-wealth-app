@@ -124,16 +124,16 @@ export const useProgressiveAssetLoading = (
     }
   }, []);
 
-  // Simulate price loading (replace with actual API call)
+  // Fetch price using AssetValuator
   const loadPrice = useCallback(async (symbol: string): Promise<number> => {
     const requestKey = `price-${symbol}`;
-    
+
     if (activeRequests.current.has(requestKey)) {
       throw new Error('Request already in progress');
     }
 
     activeRequests.current.add(requestKey);
-    
+
     try {
       // Check if we already have a recent price
       const existingPrice = prices[symbol];
@@ -141,19 +141,15 @@ export const useProgressiveAssetLoading = (
         return existingPrice;
       }
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 1500 + 300));
-      
-      // Simulate occasional errors
-      if (Math.random() < 0.05) {
-        throw new Error('Price fetch failed');
+      const { AssetValuator } = await import('@cygnus-wealth/asset-valuator');
+      const valuator = new AssetValuator();
+      const priceData = await valuator.getPrice(symbol);
+      const price = priceData?.price || 0;
+      if (price > 0) {
+        updatePrice(symbol, price);
       }
+      return price;
 
-      // Return simulated price
-      const simulatedPrice = Math.random() * 100 + 1;
-      updatePrice(symbol, simulatedPrice);
-      return simulatedPrice;
-      
     } finally {
       activeRequests.current.delete(requestKey);
     }
@@ -284,31 +280,26 @@ export const useProgressiveAssetLoading = (
   const loadingStartedRef = useRef<string>('');
   
   useEffect(() => {
-    // TEMPORARILY DISABLED to debug performance issue
-    console.log('[useProgressiveAssetLoading] Effect triggered but DISABLED for debugging, assets:', assets.length);
-    return;
-    
     // Create a unique key for the current assets to check if we've already started loading
     const assetsKey = assets.map(a => a.id).join(',');
-    
-    console.log('[useProgressiveAssetLoading] Effect triggered, assets:', assets.length, 'key:', assetsKey.substring(0, 50));
-    
+
     if (assets.length > 0 && loadingStartedRef.current !== assetsKey) {
-      console.log('[useProgressiveAssetLoading] Starting progressive loading for', assets.length, 'assets');
       loadingStartedRef.current = assetsKey;
-      
-      // Stagger the loading to avoid overwhelming the API
+
+      // Only load prices (balances are already fetched by useAccountSync)
+      // Deduplicate by symbol to avoid redundant price lookups
+      const symbolsSeen = new Set<string>();
       assets.forEach((asset, index) => {
+        if (symbolsSeen.has(asset.symbol)) return;
+        symbolsSeen.add(asset.symbol);
+
+        // Stagger price loading to avoid rate limiting
         setTimeout(() => {
-          console.log('[useProgressiveAssetLoading] Loading asset', asset.id);
-          loadAssetBalance(asset);
           loadAssetPrice(asset);
         }, index * staggerDelay);
       });
-    } else if (loadingStartedRef.current === assetsKey) {
-      console.log('[useProgressiveAssetLoading] Skipping - already loading these assets');
     }
-  }, [assets, loadAssetBalance, loadAssetPrice, staggerDelay]);
+  }, [assets, loadAssetPrice, staggerDelay]);
 
   return {
     loadingStates,
