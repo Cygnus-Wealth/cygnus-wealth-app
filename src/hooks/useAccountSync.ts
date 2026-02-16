@@ -114,23 +114,20 @@ export function useAccountSync() {
         });
 
         if (balance > 0n) {
-          const priceData = { price: 0 };
-          try {
-            useStore.getState().updatePrice(chainConfig.symbol, priceData?.price || 0);
-          } catch {
-            console.warn(`Price not available for ${chainConfig.symbol}`);
-          }
+          const priceUsd = await fetchPrice(chainConfig.symbol);
+          useStore.getState().updatePrice(chainConfig.symbol, priceUsd);
 
+          const formattedBalance = formatBalance(balance.toString(), 18);
           const asset: Asset = {
             id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
             symbol: chainConfig.symbol,
             name: chainConfig.name,
-            balance: formatBalance(balance.toString(), 18),
+            balance: formattedBalance,
             source: accountLabel,
             chain: chainName,
             accountId: accountId,
-            priceUsd: priceData?.price || 0,
-            valueUsd: parseFloat(formatBalance(balance.toString(), 18)) * (priceData?.price || 0),
+            priceUsd,
+            valueUsd: parseFloat(formattedBalance) * priceUsd,
             metadata: {
               address: address,
               isMultiAccount: false
@@ -153,6 +150,11 @@ export function useAccountSync() {
                 const tokenBalance = formatBalance(String(token.balance), decimals);
                 if (isNaN(parseFloat(tokenBalance))) continue;
 
+                const tokenPriceUsd = await fetchPrice(token.tokenInfo.symbol);
+                if (tokenPriceUsd > 0) {
+                  useStore.getState().updatePrice(token.tokenInfo.symbol, tokenPriceUsd);
+                }
+
                 assets.push({
                   id: `${accountId}-${token.tokenInfo.symbol}-${chainName}-${address}`,
                   symbol: token.tokenInfo.symbol,
@@ -161,8 +163,8 @@ export function useAccountSync() {
                   source: accountLabel,
                   chain: chainName,
                   accountId: accountId,
-                  priceUsd: 0,
-                  valueUsd: 0,
+                  priceUsd: tokenPriceUsd,
+                  valueUsd: parseFloat(tokenBalance) * tokenPriceUsd,
                   metadata: {
                     address: token.tokenInfo.address,
                     isMultiAccount: false
