@@ -18,6 +18,7 @@ export default defineConfig({
   ],
   optimizeDeps: {
     include: [
+      '@cygnus-wealth/asset-valuator',
       '@cygnus-wealth/evm-integration',
       '@cygnus-wealth/data-models',
       '@cygnus-wealth/wallet-integration-system'
