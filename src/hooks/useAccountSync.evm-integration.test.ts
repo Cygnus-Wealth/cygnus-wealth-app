@@ -4,6 +4,21 @@ import { useAccountSync } from './useAccountSync';
 import { useStore } from '../store/useStore';
 import type { Account } from '../store/useStore';
 
+// Use vi.hoisted() so mock functions are available when vi.mock factories run
+const {
+  mockGetAdapterByName,
+  mockGetBalance,
+  mockGetTokenBalances,
+  mockConnect,
+  mockGetSupportedChains,
+} = vi.hoisted(() => ({
+  mockGetAdapterByName: vi.fn(),
+  mockGetBalance: vi.fn(),
+  mockGetTokenBalances: vi.fn(),
+  mockConnect: vi.fn(),
+  mockGetSupportedChains: vi.fn(),
+}));
+
 // Mock the wallet integration system
 vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
   Chain: {
@@ -17,13 +32,13 @@ vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
   }
 }));
 
-// Mock viem - keep basic client creation
+// Mock viem
 vi.mock('viem', async () => {
   const actual = await vi.importActual('viem');
   return {
     ...actual,
     createPublicClient: vi.fn(() => ({
-      getBalance: vi.fn().mockResolvedValue(BigInt('1500000000000000000')), // 1.5 ETH
+      getBalance: vi.fn().mockResolvedValue(BigInt('1500000000000000000')),
       readContract: vi.fn().mockResolvedValue(BigInt('1000000000')),
     })),
   };
@@ -34,33 +49,19 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
   AssetValuator: vi.fn().mockImplementation(() => ({
     getPrice: vi.fn().mockImplementation((symbol: string) => {
       const prices: Record<string, number> = {
-        'ETH': 2000,
-        'MATIC': 1,
-        'USDC': 1,
-        'USDT': 1,
-        'DAI': 1,
+        'ETH': 2000, 'MATIC': 1, 'USDC': 1, 'USDT': 1, 'DAI': 1,
       };
       return Promise.resolve({ price: prices[symbol] || 0 });
     }),
   })),
 }));
 
-// Track ChainRegistry usage
-const mockGetAdapterByName = vi.fn();
-const mockGetBalance = vi.fn();
-const mockGetTokenBalances = vi.fn();
-const mockConnect = vi.fn();
-const mockGetSupportedChains = vi.fn();
-
+// Mock evm-integration with hoisted mock fns
 vi.mock('@cygnus-wealth/evm-integration', () => ({
   ChainRegistry: vi.fn().mockImplementation(() => ({
     getAdapterByName: mockGetAdapterByName,
     getSupportedChains: mockGetSupportedChains,
   })),
-  defaultRegistry: {
-    getAdapterByName: mockGetAdapterByName,
-    getSupportedChains: mockGetSupportedChains,
-  },
 }));
 
 // Mock fetch to ensure we're NOT using Ethplorer
@@ -74,7 +75,6 @@ describe('useAccountSync - EVM Integration', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    // Reset store
     useStore.setState({
       accounts: [],
       assets: [],
@@ -83,7 +83,6 @@ describe('useAccountSync - EVM Integration', () => {
       error: null,
     });
 
-    // Default mock: adapter returns native + token balances
     mockConnect.mockResolvedValue(undefined);
     mockGetBalance.mockResolvedValue({
       assetId: 'ethereum-native',
@@ -92,12 +91,12 @@ describe('useAccountSync - EVM Integration', () => {
     });
     mockGetTokenBalances.mockResolvedValue([
       {
-        assetId: 'ethereum-0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48',
+        assetId: 'ethereum-usdc',
         asset: { id: 'ethereum-usdc', symbol: 'USDC', name: 'USD Coin', decimals: 6, chain: 'ethereum', contractAddress: '0xa0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
         amount: '1000',
       },
       {
-        assetId: 'ethereum-0xdac17f958d2ee523a2206206994597c13d831ec7',
+        assetId: 'ethereum-usdt',
         asset: { id: 'ethereum-usdt', symbol: 'USDT', name: 'Tether USD', decimals: 6, chain: 'ethereum', contractAddress: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
         amount: '500',
       },
@@ -160,7 +159,6 @@ describe('useAccountSync - EVM Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
-      // Should have native ETH + USDC + USDT from the adapter
       expect(assets.length).toBeGreaterThanOrEqual(3);
 
       const symbols = assets.map(a => a.symbol);
@@ -187,7 +185,6 @@ describe('useAccountSync - EVM Integration', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
-      // Should have found at least the native ETH on Base
       expect(assets.length).toBeGreaterThanOrEqual(1);
       const baseAssets = assets.filter(a => a.chain === 'Base');
       expect(baseAssets.length).toBeGreaterThanOrEqual(1);
@@ -219,7 +216,6 @@ describe('useAccountSync - EVM Integration', () => {
       renderHook(() => useAccountSync());
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Should still have Ethereum assets despite BSC failure
       const assets = useStore.getState().assets;
       const ethAssets = assets.filter(a => a.chain === 'Ethereum');
       expect(ethAssets.length).toBeGreaterThanOrEqual(1);

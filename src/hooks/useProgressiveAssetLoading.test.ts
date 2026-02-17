@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Directly test that the loadBalance function in useProgressiveAssetLoading
 // does NOT contain simulation code (Math.random, setTimeout with random delay)

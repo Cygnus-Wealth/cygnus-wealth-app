@@ -247,7 +247,7 @@ describe('Dashboard', () => {
             accountId: 'account-1',
             symbol: 'SPAM',
             name: 'SpamToken',
-            balance: '999999',
+            balance: '0',
             chain: 'Ethereum',
             source: 'wallet',
             priceUsd: 0,
@@ -262,7 +262,7 @@ describe('Dashboard', () => {
       expect(screen.queryByText('SPAM')).not.toBeInTheDocument();
     });
 
-    it('should hide tokens with null priceUsd by default', () => {
+    it('should show unpriced tokens with positive balance', () => {
       useStore.setState({
         assets: [
           {
@@ -293,7 +293,8 @@ describe('Dashboard', () => {
       renderDashboard();
 
       expect(screen.getByText('ETH')).toBeInTheDocument();
-      expect(screen.queryByText('NULLPRICE')).not.toBeInTheDocument();
+      // Unpriced tokens with positive balance should now be visible
+      expect(screen.getByText('NULLPRICE')).toBeInTheDocument();
     });
 
     it('should hide spam-named tokens by default', () => {
@@ -348,7 +349,7 @@ describe('Dashboard', () => {
             id: 'asset-spam1',
             accountId: 'account-1',
             symbol: 'SPAM1',
-            name: 'SpamToken1',
+            name: 'Visit scam1.com',
             balance: '100',
             chain: 'Ethereum',
             source: 'wallet',
@@ -359,7 +360,7 @@ describe('Dashboard', () => {
             id: 'asset-spam2',
             accountId: 'account-1',
             symbol: 'SPAM2',
-            name: 'SpamToken2',
+            name: 'Claim your free airdrop',
             balance: '200',
             chain: 'Ethereum',
             source: 'wallet',
@@ -393,7 +394,7 @@ describe('Dashboard', () => {
             id: 'asset-spam',
             accountId: 'account-1',
             symbol: 'SPAM',
-            name: 'SpamToken',
+            name: 'Visit scamsite.com',
             balance: '999999',
             chain: 'Ethereum',
             source: 'wallet',
@@ -405,7 +406,7 @@ describe('Dashboard', () => {
 
       renderDashboard();
 
-      // SPAM should be hidden initially
+      // Spam-named token should be hidden initially
       expect(screen.queryByText('SPAM')).not.toBeInTheDocument();
 
       // Toggle to show all

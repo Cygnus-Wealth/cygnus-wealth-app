@@ -96,29 +96,19 @@ export const useProgressiveAssetLoading = (
     });
   }, []);
 
-  // Simulate balance loading (replace with actual API call)
+  // Return the existing balance from the asset (balances are fetched by useAccountSync)
   const loadBalance = useCallback(async (asset: Asset): Promise<string> => {
     const requestKey = `balance-${asset.id}`;
-    
+
     if (activeRequests.current.has(requestKey)) {
       throw new Error('Request already in progress');
     }
 
     activeRequests.current.add(requestKey);
-    
-    try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 500));
-      
-      // Simulate occasional errors
-      if (Math.random() < 0.1) {
-        throw new Error('Balance fetch failed');
-      }
 
-      // Return simulated balance (in real implementation, this would be the API response)
-      const simulatedBalance = (Math.random() * 1000).toFixed(4);
-      return simulatedBalance;
-      
+    try {
+      // Balances are already fetched by useAccountSync — just return the current value
+      return asset.balance;
     } finally {
       activeRequests.current.delete(requestKey);
     }
