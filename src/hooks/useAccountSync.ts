@@ -6,11 +6,11 @@ import { createPublicClient, http, type Address, type Chain } from 'viem';
 import { mainnet, polygon, arbitrum, optimism, sepolia, polygonAmoy, arbitrumSepolia, optimismSepolia } from 'viem/chains';
 import { base } from 'viem/chains';
 import { localhost } from 'viem/chains';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
 import { ChainRegistry } from '@cygnus-wealth/evm-integration';
 import type { IChainAdapter } from '@cygnus-wealth/evm-integration';
+import { SolanaIntegrationFacade } from '@cygnus-wealth/sol-integration';
 
 // Chain mapping for EVM chains
 interface ChainMapEntry {
@@ -278,12 +278,12 @@ export function useAccountSync() {
         const assets: Asset[] = [];
 
         try {
-          const connection = new Connection('https://api.mainnet-beta.solana.com');
-          const publicKey = new PublicKey(address);
-          const balanceLamports = await connection.getBalance(publicKey);
-          const balanceSol = balanceLamports / LAMPORTS_PER_SOL;
+          const env = networkEnvironment === 'testnet' ? 'testnet' : networkEnvironment === 'local' ? 'local' : 'production';
+          const facade = new SolanaIntegrationFacade({ environment: env });
 
-          if (balanceSol > 0) {
+          const balanceResult = await facade.getSolanaBalance(address);
+          if (balanceResult.isSuccess && balanceResult.getValue() > 0) {
+            const balanceSol = balanceResult.getValue();
             const priceUsd = await fetchPrice('SOL');
 
             assets.push({
@@ -301,6 +301,37 @@ export function useAccountSync() {
                 isMultiAccount: false
               }
             });
+          }
+
+          if (abortController.signal.aborted) return assets;
+
+          const tokensResult = await facade.getTokenBalances(address);
+          if (tokensResult.isSuccess) {
+            for (const token of tokensResult.getValue()) {
+              if (abortController.signal.aborted) return assets;
+              if (token.balance <= 0) continue;
+
+              const tokenPriceUsd = token.valueUSD != null ? token.valueUSD / token.balance : await fetchPrice(token.symbol);
+              if (tokenPriceUsd > 0) {
+                useStore.getState().updatePrice(token.symbol, tokenPriceUsd);
+              }
+
+              assets.push({
+                id: `${accountId}-${token.symbol}-Solana-${address}`,
+                symbol: token.symbol,
+                name: token.name,
+                balance: token.balance.toString(),
+                source: accountLabel,
+                chain: 'Solana',
+                accountId: accountId,
+                priceUsd: tokenPriceUsd || null,
+                valueUsd: tokenPriceUsd > 0 ? token.balance * tokenPriceUsd : null,
+                metadata: {
+                  address: token.mint,
+                  isMultiAccount: false
+                }
+              });
+            }
           }
         } catch (error) {
           console.error(`Error fetching Solana balance for ${address}:`, error);
