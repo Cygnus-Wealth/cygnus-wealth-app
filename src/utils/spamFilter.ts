@@ -20,24 +20,36 @@ const SPAM_NAME_PATTERNS = [
 /**
  * Determines if an asset is spam or worthless.
  * An asset is considered spam/worthless if:
- * - Its valueUsd is 0, null, undefined, NaN, or negative
- * - Its priceUsd is 0, null, undefined, or NaN (unpriced)
  * - Its name matches known spam patterns
+ * - It has zero balance AND no price data (true dust/spam)
+ * - Its valueUsd is negative
+ *
+ * Tokens with a positive on-chain balance but no price data are NOT
+ * considered spam — they are legitimate tokens whose price is simply
+ * unavailable. These should still be displayed to the user.
  */
 export function isSpamOrWorthless(asset: Asset): boolean {
-  // Check price: unpriced tokens are considered worthless
-  if (asset.priceUsd == null || isNaN(asset.priceUsd) || asset.priceUsd <= 0) {
-    return true;
-  }
-
-  // Check value: zero or invalid value
-  if (asset.valueUsd == null || isNaN(asset.valueUsd) || asset.valueUsd <= 0) {
-    return true;
-  }
-
-  // Check name against spam patterns
+  // Check name against spam patterns first (always filter spam names)
   const name = asset.name || '';
   if (SPAM_NAME_PATTERNS.some(pattern => pattern.test(name))) {
+    return true;
+  }
+
+  // Negative value is always invalid
+  if (asset.valueUsd != null && !isNaN(asset.valueUsd) && asset.valueUsd < 0) {
+    return true;
+  }
+
+  // If the token has a positive balance, it's not spam — even if unpriced
+  const balance = parseFloat(asset.balance);
+  if (!isNaN(balance) && balance > 0) {
+    return false;
+  }
+
+  // Zero/invalid balance with no price data = worthless
+  const hasPrice = asset.priceUsd != null && !isNaN(asset.priceUsd) && asset.priceUsd > 0;
+  const hasValue = asset.valueUsd != null && !isNaN(asset.valueUsd) && asset.valueUsd > 0;
+  if (!hasPrice && !hasValue) {
     return true;
   }
 
@@ -53,10 +65,14 @@ export const DUST_THRESHOLD_USD = 0.01;
 /**
  * Determines if an aggregated asset should be hidden by default.
  * Hides assets that are spam/worthless or below the dust threshold.
+ * Tokens with no price data but a positive balance are NOT hidden
+ * (dust threshold only applies to priced tokens).
  */
 export function shouldHideByDefault(asset: Asset, totalValueUsd: number): boolean {
   if (isSpamOrWorthless(asset)) return true;
-  if (totalValueUsd < DUST_THRESHOLD_USD) return true;
+  // Only apply dust threshold to tokens that have a known USD value
+  const hasPrice = asset.priceUsd != null && !isNaN(asset.priceUsd) && asset.priceUsd > 0;
+  if (hasPrice && totalValueUsd < DUST_THRESHOLD_USD) return true;
   return false;
 }
 

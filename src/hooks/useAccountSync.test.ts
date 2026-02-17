@@ -17,6 +17,18 @@ vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
   }
 }));
 
+// Mock evm-integration to avoid module resolution errors
+vi.mock('@cygnus-wealth/evm-integration', () => ({
+  ChainRegistry: vi.fn().mockImplementation(() => ({
+    getAdapterByName: vi.fn().mockReturnValue({
+      connect: vi.fn().mockResolvedValue(undefined),
+      getBalance: vi.fn().mockResolvedValue({ amount: '0' }),
+      getTokenBalances: vi.fn().mockResolvedValue([]),
+    }),
+    getSupportedChains: vi.fn().mockReturnValue([]),
+  })),
+}));
+
 // Mock viem
 vi.mock('viem', async () => {
   const actual = await vi.importActual('viem');

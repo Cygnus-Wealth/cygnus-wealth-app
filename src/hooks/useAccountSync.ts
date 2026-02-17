@@ -1,14 +1,16 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { formatBalance } from '../utils/formatters';
 import type { Asset } from '../store/useStore';
 import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
 import { createPublicClient, http, type Address, type Chain } from 'viem';
 import { mainnet, polygon, arbitrum, optimism, sepolia, polygonAmoy, arbitrumSepolia, optimismSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import { localhost } from 'viem/chains';
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
+import { ChainRegistry } from '@cygnus-wealth/evm-integration';
+import type { IChainAdapter } from '@cygnus-wealth/evm-integration';
 
 // Chain mapping for EVM chains
 interface ChainMapEntry {
@@ -22,14 +24,15 @@ const productionChainMap: Record<string, ChainMapEntry> = {
   'Ethereum': { chain: mainnet, chainId: 1, symbol: 'ETH', name: 'Ethereum' },
   'Polygon': { chain: polygon, chainId: 137, symbol: 'MATIC', name: 'Polygon' },
   'Arbitrum': { chain: arbitrum, chainId: 42161, symbol: 'ETH', name: 'Arbitrum Ethereum' },
-  'Optimism': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' }
+  'Optimism': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' },
+  'Base': { chain: base, chainId: 8453, symbol: 'ETH', name: 'Base Ethereum' },
 };
 
 const testnetChainMap: Record<string, ChainMapEntry> = {
   'Ethereum': { chain: sepolia, chainId: 11155111, symbol: 'ETH', name: 'Sepolia ETH' },
   'Polygon': { chain: polygonAmoy, chainId: 80002, symbol: 'MATIC', name: 'Polygon Amoy' },
   'Arbitrum': { chain: arbitrumSepolia, chainId: 421614, symbol: 'ETH', name: 'Arbitrum Sepolia' },
-  'Optimism': { chain: optimismSepolia, chainId: 11155420, symbol: 'ETH', name: 'Optimism Sepolia' }
+  'Optimism': { chain: optimismSepolia, chainId: 11155420, symbol: 'ETH', name: 'Optimism Sepolia' },
 };
 
 const localChainMap: Record<string, ChainMapEntry> = {
@@ -42,6 +45,24 @@ function getChainMap(env: NetworkEnvironment): Record<string, ChainMapEntry> {
     case 'local': return localChainMap;
     default: return productionChainMap;
   }
+}
+
+// Map chain display names to evm-integration registry names
+const chainNameToRegistryName: Record<string, string> = {
+  'Ethereum': 'Ethereum',
+  'Polygon': 'Polygon',
+  'Arbitrum': 'Arbitrum One',
+  'Optimism': 'Optimism',
+  'Base': 'Base',
+};
+
+// Create a ChainRegistry instance for ERC20 token discovery
+let _registryInstance: InstanceType<typeof ChainRegistry> | null = null;
+function getRegistry(): InstanceType<typeof ChainRegistry> {
+  if (!_registryInstance) {
+    _registryInstance = new ChainRegistry();
+  }
+  return _registryInstance;
 }
 
 const SYNC_INTERVAL_MS = 60000; // 60 seconds
@@ -156,12 +177,12 @@ export function useAccountSync() {
         try {
           const chainConfig = currentChainMap[chainName];
           if (!chainConfig) {
-            console.warn(`No chain config for ${chainName}`);
+            console.warn(`No chain config for ${chainName}, skipping`);
             return assets;
           }
 
+          // Fetch native balance via viem
           const client = createEvmClient(chainName);
-
           const balance = await client.getBalance({
             address: address as Address
           });
@@ -172,7 +193,7 @@ export function useAccountSync() {
             const priceUsd = await fetchPrice(chainConfig.symbol);
             useStore.getState().updatePrice(chainConfig.symbol, priceUsd);
 
-            const formattedBalance = formatBalance(balance.toString(), 18);
+            const formattedBalance = (Number(balance) / 1e18).toFixed(6).replace(/\.?0+$/, '');
             const asset: Asset = {
               id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
               symbol: chainConfig.symbol,
@@ -192,46 +213,57 @@ export function useAccountSync() {
             assets.push(asset);
           }
 
-          // Fetch ERC20 token balances
-          try {
-            const response = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
-            if (abortController.signal.aborted) return assets;
-            if (response.ok) {
-              const data = await response.json();
-              if (data.tokens && Array.isArray(data.tokens)) {
-                for (const token of data.tokens) {
-                  if (abortController.signal.aborted) return assets;
-                  if (!token.tokenInfo?.decimals || !token.tokenInfo?.symbol) continue;
-                  const decimals = parseInt(token.tokenInfo.decimals);
-                  if (isNaN(decimals)) continue;
-                  const tokenBalance = formatBalance(String(token.balance), decimals);
-                  if (isNaN(parseFloat(tokenBalance))) continue;
-
-                  const tokenPriceUsd = await fetchPrice(token.tokenInfo.symbol);
-                  if (tokenPriceUsd > 0) {
-                    useStore.getState().updatePrice(token.tokenInfo.symbol, tokenPriceUsd);
-                  }
-
-                  assets.push({
-                    id: `${accountId}-${token.tokenInfo.symbol}-${chainName}-${address}`,
-                    symbol: token.tokenInfo.symbol,
-                    name: token.tokenInfo.name || token.tokenInfo.symbol,
-                    balance: tokenBalance,
-                    source: accountLabel,
-                    chain: chainName,
-                    accountId: accountId,
-                    priceUsd: tokenPriceUsd,
-                    valueUsd: parseFloat(tokenBalance) * tokenPriceUsd,
-                    metadata: {
-                      address: token.tokenInfo.address,
-                      isMultiAccount: false
-                    }
-                  });
-                }
+          // Fetch ERC20 token balances via @cygnus-wealth/evm-integration
+          const registryName = chainNameToRegistryName[chainName];
+          if (registryName) {
+            try {
+              const registry = getRegistry();
+              let adapter: IChainAdapter;
+              try {
+                adapter = registry.getAdapterByName(registryName);
+              } catch {
+                console.warn(`evm-integration has no adapter for ${registryName}, skipping ERC20 tokens`);
+                return assets;
               }
+              await adapter.connect();
+
+              if (abortController.signal.aborted) return assets;
+
+              const tokenBalances = await adapter.getTokenBalances(address as Address);
+
+              for (const tokenBalance of tokenBalances) {
+                if (abortController.signal.aborted) return assets;
+
+                const symbol = tokenBalance.asset.symbol;
+                const name = tokenBalance.asset.name || symbol;
+                const tokenAmount = tokenBalance.amount;
+                const parsedBalance = parseFloat(tokenAmount);
+                if (isNaN(parsedBalance) || parsedBalance <= 0) continue;
+
+                const tokenPriceUsd = await fetchPrice(symbol);
+                if (tokenPriceUsd > 0) {
+                  useStore.getState().updatePrice(symbol, tokenPriceUsd);
+                }
+
+                assets.push({
+                  id: `${accountId}-${symbol}-${chainName}-${address}`,
+                  symbol,
+                  name,
+                  balance: tokenAmount,
+                  source: accountLabel,
+                  chain: chainName,
+                  accountId: accountId,
+                  priceUsd: tokenPriceUsd || null,
+                  valueUsd: tokenPriceUsd > 0 ? parsedBalance * tokenPriceUsd : null,
+                  metadata: {
+                    address: tokenBalance.asset.contractAddress || undefined,
+                    isMultiAccount: false
+                  }
+                });
+              }
+            } catch (tokenError) {
+              console.error(`Error fetching ERC20 tokens for ${chainName} - ${address}:`, tokenError);
             }
-          } catch (tokenError) {
-            console.error(`Error fetching ERC20 tokens for ${chainName} - ${address}:`, tokenError);
           }
 
         } catch (error) {

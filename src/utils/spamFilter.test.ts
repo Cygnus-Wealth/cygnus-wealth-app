@@ -23,28 +23,21 @@ describe('spamFilter', () => {
       expect(isSpamOrWorthless(makeAsset())).toBe(false);
     });
 
-    it('should return true when priceUsd is 0', () => {
-      expect(isSpamOrWorthless(makeAsset({ priceUsd: 0 }))).toBe(true);
+    it('should NOT classify tokens with positive balance as spam when priceUsd is 0', () => {
+      // Tokens with real on-chain balances but no price data should still show
+      expect(isSpamOrWorthless(makeAsset({ priceUsd: 0, valueUsd: 0, balance: '100' }))).toBe(false);
     });
 
-    it('should return true when priceUsd is null', () => {
-      expect(isSpamOrWorthless(makeAsset({ priceUsd: null }))).toBe(true);
+    it('should NOT classify tokens with positive balance as spam when priceUsd is null', () => {
+      expect(isSpamOrWorthless(makeAsset({ priceUsd: null, valueUsd: null, balance: '500' }))).toBe(false);
     });
 
-    it('should return true when priceUsd is NaN', () => {
-      expect(isSpamOrWorthless(makeAsset({ priceUsd: NaN }))).toBe(true);
+    it('should classify tokens with zero balance AND no price as spam', () => {
+      expect(isSpamOrWorthless(makeAsset({ priceUsd: null, valueUsd: null, balance: '0' }))).toBe(true);
     });
 
-    it('should return true when valueUsd is 0', () => {
-      expect(isSpamOrWorthless(makeAsset({ valueUsd: 0 }))).toBe(true);
-    });
-
-    it('should return true when valueUsd is null', () => {
-      expect(isSpamOrWorthless(makeAsset({ valueUsd: null }))).toBe(true);
-    });
-
-    it('should return true when valueUsd is NaN', () => {
-      expect(isSpamOrWorthless(makeAsset({ valueUsd: NaN }))).toBe(true);
+    it('should return true when priceUsd is NaN and balance is zero', () => {
+      expect(isSpamOrWorthless(makeAsset({ priceUsd: NaN, valueUsd: NaN, balance: '0' }))).toBe(true);
     });
 
     it('should return true when valueUsd is negative', () => {
@@ -74,8 +67,12 @@ describe('spamFilter', () => {
   });
 
   describe('shouldHideByDefault', () => {
-    it('should hide spam tokens', () => {
-      expect(shouldHideByDefault(makeAsset({ priceUsd: 0 }), 0)).toBe(true);
+    it('should hide tokens with zero balance and no price', () => {
+      expect(shouldHideByDefault(makeAsset({ priceUsd: 0, valueUsd: 0, balance: '0' }), 0)).toBe(true);
+    });
+
+    it('should NOT hide unpriced tokens with positive balance', () => {
+      expect(shouldHideByDefault(makeAsset({ priceUsd: null, valueUsd: null, balance: '100' }), 0)).toBe(false);
     });
 
     it('should hide dust (below threshold)', () => {
@@ -97,7 +94,7 @@ describe('spamFilter', () => {
     it('should remove spam tokens from array', () => {
       const assets = [
         makeAsset({ id: 'good-1', symbol: 'ETH', priceUsd: 2000, valueUsd: 2000 }),
-        makeAsset({ id: 'spam-1', symbol: 'SCAM', priceUsd: 0, valueUsd: 0 }),
+        makeAsset({ id: 'spam-1', symbol: 'SCAM', priceUsd: 0, valueUsd: 0, balance: '0' }),
         makeAsset({ id: 'good-2', symbol: 'USDC', priceUsd: 1, valueUsd: 100 }),
         makeAsset({ id: 'spam-2', name: 'Visit scam.com to claim', priceUsd: 1, valueUsd: 1 }),
       ];
@@ -107,10 +104,19 @@ describe('spamFilter', () => {
       expect(filtered.map(a => a.id)).toEqual(['good-1', 'good-2']);
     });
 
-    it('should return empty array when all tokens are spam', () => {
+    it('should keep unpriced tokens that have a positive balance', () => {
       const assets = [
-        makeAsset({ id: 'spam-1', priceUsd: 0, valueUsd: 0 }),
-        makeAsset({ id: 'spam-2', priceUsd: null, valueUsd: null }),
+        makeAsset({ id: 'unpriced-1', priceUsd: 0, valueUsd: 0, balance: '100' }),
+        makeAsset({ id: 'unpriced-2', priceUsd: null, valueUsd: null, balance: '50' }),
+      ];
+
+      expect(filterSpamTokens(assets)).toHaveLength(2);
+    });
+
+    it('should return empty array when all tokens are truly spam', () => {
+      const assets = [
+        makeAsset({ id: 'spam-1', priceUsd: 0, valueUsd: 0, balance: '0' }),
+        makeAsset({ id: 'spam-2', priceUsd: null, valueUsd: null, balance: '0' }),
       ];
 
       expect(filterSpamTokens(assets)).toHaveLength(0);
