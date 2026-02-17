@@ -22,13 +22,14 @@ import { useAccountSync } from '../hooks/useAccountSync';
 import { useProgressiveAssetLoading } from '../hooks/useProgressiveAssetLoading';
 import { SimpleBalanceCell } from './dashboard/SimpleBalanceCell';
 import { ValueCell } from './dashboard/ValueCell';
+import { shouldHideByDefault } from '../utils/spamFilter';
 import type { Asset } from '../store/useStore';
 
 const ITEMS_PER_PAGE = 10;
 
 export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
-  const [showZeroBalances, setShowZeroBalances] = useState(false);
+  const [showHiddenTokens, setShowHiddenTokens] = useState(false);
   
   // Get data from global store - use selectors to prevent unnecessary re-renders
   const accounts = useStore(state => state.accounts);
@@ -102,10 +103,16 @@ export default function Dashboard() {
     return Array.from(assetMap.values());
   }, [assets, accounts]);
 
-  // Filter assets based on zero balance preference
-  const filteredAssets = showZeroBalances 
-    ? aggregatedAssets 
-    : aggregatedAssets.filter(item => item.totalBalance > 0);
+  // Filter assets: hide spam, worthless, zero-balance, and dust tokens by default
+  const filteredAssets = showHiddenTokens
+    ? aggregatedAssets
+    : aggregatedAssets.filter(item => {
+        // Hide zero balance tokens
+        if (item.totalBalance <= 0) return false;
+        // Hide spam/worthless/dust tokens using the spam filter
+        if (shouldHideByDefault(item.asset, item.totalValue)) return false;
+        return true;
+      });
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
@@ -113,9 +120,12 @@ export default function Dashboard() {
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentAssets = filteredAssets.slice(startIndex, endIndex);
 
+  // Count hidden tokens for display
+  const hiddenCount = aggregatedAssets.length - filteredAssets.length;
+
   // Reset to page 1 when filter changes
-  const handleZeroBalanceChange = (checked: boolean) => {
-    setShowZeroBalances(checked);
+  const handleToggleHidden = (checked: boolean) => {
+    setShowHiddenTokens(checked);
     setCurrentPage(1);
   };
 
@@ -181,14 +191,14 @@ export default function Dashboard() {
               </Heading>
               <Flex align="center" gap={4}>
                 <Flex align="center" gap={2}>
-                  <Box as={showZeroBalances ? FiEye : FiEyeOff} color="gray.600" />
+                  <Box as={showHiddenTokens ? FiEye : FiEyeOff} color="gray.600" />
                   <Text fontSize="sm" color="gray.600">
-                    Show zero balances
+                    Show all tokens{hiddenCount > 0 ? ` (${hiddenCount} hidden)` : ''}
                   </Text>
                   <input
                     type="checkbox"
-                    checked={showZeroBalances}
-                    onChange={(e) => handleZeroBalanceChange(e.target.checked)}
+                    checked={showHiddenTokens}
+                    onChange={(e) => handleToggleHidden(e.target.checked)}
                     style={{
                       marginLeft: '8px',
                       cursor: 'pointer',
@@ -354,9 +364,9 @@ export default function Dashboard() {
               <Flex justify="space-between" align="center" mt={4}>
                 <Text fontSize="sm" color="gray.600">
                   Showing {startIndex + 1}-{Math.min(endIndex, filteredAssets.length)} of {filteredAssets.length} assets
-                  {!showZeroBalances && assets.length > filteredAssets.length && (
+                  {!showHiddenTokens && hiddenCount > 0 && (
                     <Text as="span" color="gray.500">
-                      {' '}({assets.length - filteredAssets.length} hidden)
+                      {' '}({hiddenCount} hidden)
                     </Text>
                   )}
                 </Text>
