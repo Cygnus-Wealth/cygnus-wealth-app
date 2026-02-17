@@ -40,7 +40,7 @@ describe('Dashboard', () => {
   describe('Empty State', () => {
     it('should display empty state when no accounts are connected', () => {
       renderDashboard();
-      
+
       expect(screen.getByText('Portfolio Dashboard')).toBeInTheDocument();
       expect(screen.getByText('No assets to display')).toBeInTheDocument();
       expect(screen.getByText('Add accounts to start tracking your portfolio')).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('Dashboard', () => {
 
     it('should show zero values in portfolio summary', () => {
       renderDashboard();
-      
+
       expect(screen.getByText('$0.00')).toBeInTheDocument(); // Total value
       expect(screen.getAllByText('0')).toHaveLength(2); // Total assets and connected accounts
     });
@@ -135,7 +135,7 @@ describe('Dashboard', () => {
 
     it('should display portfolio summary correctly', () => {
       renderDashboard();
-      
+
       expect(screen.getByText('$5000.00')).toBeInTheDocument(); // Total value
       expect(screen.getByText('3')).toBeInTheDocument(); // Total assets
       // Use getAllByText to handle multiple "2" texts and check for connected accounts
@@ -145,14 +145,14 @@ describe('Dashboard', () => {
 
     it('should aggregate assets by symbol and connection', () => {
       renderDashboard();
-      
+
       // Check for aggregated ETH
       expect(screen.getByText('ETH')).toBeInTheDocument();
       // Use getAllByText since "2" appears multiple times
       const twoTexts = screen.getAllByText('2');
       expect(twoTexts.length).toBeGreaterThan(0); // Balance (1.5 + 0.5)
       expect(screen.getByText('MetaMask (2 accounts)')).toBeInTheDocument();
-      
+
       // Check for USDC - balance is formatted with .toFixed(4)
       expect(screen.getByText('USDC')).toBeInTheDocument();
       expect(screen.getByText('1000.0000')).toBeInTheDocument();
@@ -160,12 +160,12 @@ describe('Dashboard', () => {
 
     it('should display asset details correctly', () => {
       renderDashboard();
-      
+
       // Check ETH row
       const ethRow = screen.getByText('ETH').closest('tr');
       expect(ethRow).toHaveTextContent('$2000.00'); // Price
       expect(ethRow).toHaveTextContent('$4000.00'); // Total value
-      
+
       // Check USDC row
       const usdcRow = screen.getByText('USDC').closest('tr');
       expect(usdcRow).toHaveTextContent('$1.00'); // Price
@@ -174,39 +174,14 @@ describe('Dashboard', () => {
 
     it('should display chain badges', () => {
       renderDashboard();
-      
+
       const chainBadges = screen.getAllByText('Ethereum');
       expect(chainBadges.length).toBeGreaterThan(0);
     });
   });
 
-  describe('Zero Balance Filtering', () => {
+  describe('Token Filtering', () => {
     beforeEach(() => {
-      const assets: Asset[] = [
-        {
-          id: 'asset-1',
-          accountId: 'account-1',
-          symbol: 'ETH',
-          name: 'Ethereum',
-          balance: '1.5',
-          chain: 'Ethereum',
-          source: 'wallet',
-          priceUsd: 2000,
-          valueUsd: 3000,
-        },
-        {
-          id: 'asset-2',
-          accountId: 'account-1',
-          symbol: 'USDC',
-          name: 'USD Coin',
-          balance: '0',
-          chain: 'Ethereum',
-          source: 'wallet',
-          priceUsd: 1,
-          valueUsd: 0,
-        },
-      ];
-
       useStore.setState({
         accounts: [{
           id: 'account-1',
@@ -216,51 +191,253 @@ describe('Dashboard', () => {
           address: '0x1234',
           status: 'connected',
         }],
-        assets,
       });
     });
 
     it('should hide zero balance assets by default', () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-2',
+            accountId: 'account-1',
+            symbol: 'USDC',
+            name: 'USD Coin',
+            balance: '0',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 1,
+            valueUsd: 0,
+          },
+        ],
+      });
+
       renderDashboard();
-      
+
       expect(screen.getByText('ETH')).toBeInTheDocument();
       expect(screen.queryByText('USDC')).not.toBeInTheDocument();
     });
 
-    it('should show zero balance assets when checkbox is checked', async () => {
+    it('should hide unpriced tokens (priceUsd=0) by default', () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-spam',
+            accountId: 'account-1',
+            symbol: 'SPAM',
+            name: 'SpamToken',
+            balance: '999999',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 0,
+            valueUsd: 0,
+          },
+        ],
+      });
+
       renderDashboard();
-      
+
+      expect(screen.getByText('ETH')).toBeInTheDocument();
+      expect(screen.queryByText('SPAM')).not.toBeInTheDocument();
+    });
+
+    it('should hide tokens with null priceUsd by default', () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-null',
+            accountId: 'account-1',
+            symbol: 'NULLPRICE',
+            name: 'NullPriceToken',
+            balance: '100',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: null,
+            valueUsd: null,
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      expect(screen.getByText('ETH')).toBeInTheDocument();
+      expect(screen.queryByText('NULLPRICE')).not.toBeInTheDocument();
+    });
+
+    it('should hide spam-named tokens by default', () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-scam',
+            accountId: 'account-1',
+            symbol: 'SCAM',
+            name: 'Visit ethgift.org to claim',
+            balance: '10000',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 1,
+            valueUsd: 10000,
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      expect(screen.getByText('ETH')).toBeInTheDocument();
+      expect(screen.queryByText('SCAM')).not.toBeInTheDocument();
+    });
+
+    it('should show hidden token count', () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-spam1',
+            accountId: 'account-1',
+            symbol: 'SPAM1',
+            name: 'SpamToken1',
+            balance: '100',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 0,
+            valueUsd: 0,
+          },
+          {
+            id: 'asset-spam2',
+            accountId: 'account-1',
+            symbol: 'SPAM2',
+            name: 'SpamToken2',
+            balance: '200',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 0,
+            valueUsd: 0,
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      // The toggle label should show hidden count
+      expect(screen.getByText(/2 hidden/)).toBeInTheDocument();
+    });
+
+    it('should show all tokens when toggle is checked', async () => {
+      useStore.setState({
+        assets: [
+          {
+            id: 'asset-1',
+            accountId: 'account-1',
+            symbol: 'ETH',
+            name: 'Ethereum',
+            balance: '1.5',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 2000,
+            valueUsd: 3000,
+          },
+          {
+            id: 'asset-spam',
+            accountId: 'account-1',
+            symbol: 'SPAM',
+            name: 'SpamToken',
+            balance: '999999',
+            chain: 'Ethereum',
+            source: 'wallet',
+            priceUsd: 0,
+            valueUsd: 0,
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      // SPAM should be hidden initially
+      expect(screen.queryByText('SPAM')).not.toBeInTheDocument();
+
+      // Toggle to show all
       const checkbox = screen.getByRole('checkbox');
-      expect(checkbox).not.toBeChecked();
-      
-      // Click checkbox
       await act(async () => {
         checkbox.click();
       });
-      
-      // Check synchronously after the action
+
+      // Now SPAM should be visible
       expect(screen.getByText('ETH')).toBeInTheDocument();
-      expect(screen.getByText('USDC')).toBeInTheDocument();
+      expect(screen.getByText('SPAM')).toBeInTheDocument();
     });
   });
 
   describe('Loading State', () => {
-    it('should show loading spinner when data is loading', () => {
-      // Set up assets with a non-zero balance
+    it('should render assets that are still loading prices', () => {
+      // Set up an asset with a valid price so it passes the spam filter
+      // (an asset with priceUsd=0 would be hidden as "unpriced")
       const assets: Asset[] = [
         {
           id: 'asset-1',
           accountId: 'account-1',
           symbol: 'ETH',
           name: 'Ethereum',
-          balance: '0.1', // Non-zero balance to avoid filtering
+          balance: '0.1',
           chain: 'Ethereum',
           source: 'wallet',
-          priceUsd: 0, // Price loading
-          valueUsd: 0,
+          priceUsd: 2000,
+          valueUsd: 200,
         },
       ];
-      
+
       useStore.setState({
         accounts: [{
           id: 'account-1',
@@ -272,14 +449,11 @@ describe('Dashboard', () => {
         }],
         assets,
       });
-      
+
       renderDashboard();
-      
-      // The Dashboard should render without errors
-      // The loading state is managed internally by the useProgressiveAssetLoading hook
+
       expect(screen.getByText('Assets')).toBeInTheDocument();
       expect(screen.getByText('ETH')).toBeInTheDocument();
-      // Balance should be displayed
       expect(screen.getByText('0.1000')).toBeInTheDocument();
     });
   });
@@ -287,7 +461,7 @@ describe('Dashboard', () => {
   describe('Navigation', () => {
     it('should have correct links to connections page', () => {
       renderDashboard();
-      
+
       const manageLink = screen.getByText('Add accounts');
       expect(manageLink.closest('a')).toHaveAttribute('href', '/settings/connections');
     });
@@ -303,9 +477,9 @@ describe('Dashboard', () => {
           status: 'connected',
         }],
       });
-      
+
       renderDashboard();
-      
+
       const manageLink = screen.getByText('Manage');
       expect(manageLink.closest('a')).toHaveAttribute('href', '/settings/connections');
     });
@@ -313,7 +487,7 @@ describe('Dashboard', () => {
 
   describe('Pagination', () => {
     beforeEach(() => {
-      // Create 15 assets to test pagination
+      // Create 15 assets to test pagination - all with valid prices to pass spam filter
       const assets: Asset[] = Array.from({ length: 15 }, (_, i) => ({
         id: `asset-${i}`,
         accountId: 'account-1',
@@ -341,25 +515,25 @@ describe('Dashboard', () => {
 
     it('should show pagination controls when more than 10 items', () => {
       renderDashboard();
-      
+
       expect(screen.getByText('1 / 2')).toBeInTheDocument();
       expect(screen.getByText('Showing 1-10 of 15 assets')).toBeInTheDocument();
     });
 
     it('should navigate between pages', async () => {
       renderDashboard();
-      
+
       // Should show first 10 items
       expect(screen.getByText('TOKEN0')).toBeInTheDocument();
       expect(screen.queryByText('TOKEN10')).not.toBeInTheDocument();
-      
+
       // Click next page
       const nextButton = screen.getByLabelText('Next page');
-      
+
       await act(async () => {
         nextButton.click();
       });
-      
+
       // Check the results synchronously
       expect(screen.queryByText('TOKEN0')).not.toBeInTheDocument();
       expect(screen.getByText('TOKEN10')).toBeInTheDocument();

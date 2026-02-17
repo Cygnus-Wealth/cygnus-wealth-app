@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { formatBalance } from '../utils/formatters';
 import type { Asset } from '../store/useStore';
@@ -61,6 +61,18 @@ async function fetchPrice(symbol: string): Promise<number> {
   }
 }
 
+/**
+ * Deduplicate assets by ID. When duplicates exist, the last occurrence wins.
+ * This prevents accumulation from overlapping syncs.
+ */
+function deduplicateAssets(assets: Asset[]): Asset[] {
+  const assetMap = new Map<string, Asset>();
+  for (const asset of assets) {
+    assetMap.set(asset.id, asset);
+  }
+  return Array.from(assetMap.values());
+}
+
 export function useAccountSync() {
   // Only subscribe to data values, NOT action functions
   const accounts = useStore(state => state.accounts);
@@ -74,256 +86,26 @@ export function useAccountSync() {
     [accounts]
   );
 
-  // Stable key representing current wallet accounts
+  // Stable key representing current wallet accounts (identity-based, not reference-based)
   const accountsKey = useMemo(
     () => walletAccounts.map(a => `${a.id}-${a.address}-${a.platform}`).join(','),
     [walletAccounts]
   );
 
-  // Use a ref to track the last synced accounts to prevent duplicate syncs
+  // Refs for preventing concurrent syncs and tracking state
   const lastSyncedAccountsRef = useRef<string>('');
+  const syncInProgressRef = useRef<boolean>(false);
+  const syncAbortRef = useRef<AbortController | null>(null);
 
-  const syncAccounts = useCallback(async () => {
-    const { setAssets, calculateTotalValue, setIsLoading, updateAccount } = useStore.getState();
+  // Use refs for values needed in sync to avoid re-creating the callback
+  const walletAccountsRef = useRef(walletAccounts);
+  const accountsKeyRef = useRef(accountsKey);
+  const chainMapRef = useRef(chainMap);
 
-    // Create EVM client for a given chain
-    const createEvmClient = (chainName: string) => {
-      const chainConfig = chainMap[chainName];
-      if (!chainConfig) {
-        console.error(`No chain config found for ${chainName}`);
-        return createPublicClient({ chain: mainnet, transport: http() });
-      }
-      return createPublicClient({ chain: chainConfig.chain, transport: http() });
-    };
-
-    const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
-      console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
-      const assets: Asset[] = [];
-
-      try {
-        const chainConfig = chainMap[chainName];
-        if (!chainConfig) {
-          console.warn(`No chain config for ${chainName}`);
-          return assets;
-        }
-
-        const client = createEvmClient(chainName);
-
-        const balance = await client.getBalance({
-          address: address as Address
-        });
-
-        if (balance > 0n) {
-          const priceUsd = await fetchPrice(chainConfig.symbol);
-          useStore.getState().updatePrice(chainConfig.symbol, priceUsd);
-
-          const formattedBalance = formatBalance(balance.toString(), 18);
-          const asset: Asset = {
-            id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
-            symbol: chainConfig.symbol,
-            name: chainConfig.name,
-            balance: formattedBalance,
-            source: accountLabel,
-            chain: chainName,
-            accountId: accountId,
-            priceUsd,
-            valueUsd: parseFloat(formattedBalance) * priceUsd,
-            metadata: {
-              address: address,
-              isMultiAccount: false
-            }
-          };
-
-          assets.push(asset);
-        }
-
-        // Fetch ERC20 token balances
-        try {
-          const response = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
-          if (response.ok) {
-            const data = await response.json();
-            if (data.tokens && Array.isArray(data.tokens)) {
-              for (const token of data.tokens) {
-                if (!token.tokenInfo?.decimals || !token.tokenInfo?.symbol) continue;
-                const decimals = parseInt(token.tokenInfo.decimals);
-                if (isNaN(decimals)) continue;
-                const tokenBalance = formatBalance(String(token.balance), decimals);
-                if (isNaN(parseFloat(tokenBalance))) continue;
-
-                const tokenPriceUsd = await fetchPrice(token.tokenInfo.symbol);
-                if (tokenPriceUsd > 0) {
-                  useStore.getState().updatePrice(token.tokenInfo.symbol, tokenPriceUsd);
-                }
-
-                assets.push({
-                  id: `${accountId}-${token.tokenInfo.symbol}-${chainName}-${address}`,
-                  symbol: token.tokenInfo.symbol,
-                  name: token.tokenInfo.name || token.tokenInfo.symbol,
-                  balance: tokenBalance,
-                  source: accountLabel,
-                  chain: chainName,
-                  accountId: accountId,
-                  priceUsd: tokenPriceUsd,
-                  valueUsd: parseFloat(tokenBalance) * tokenPriceUsd,
-                  metadata: {
-                    address: token.tokenInfo.address,
-                    isMultiAccount: false
-                  }
-                });
-              }
-            }
-          }
-        } catch (tokenError) {
-          console.error(`Error fetching ERC20 tokens for ${chainName} - ${address}:`, tokenError);
-        }
-
-      } catch (error) {
-        console.error(`Error fetching EVM balances for ${chainName} - ${address}:`, error);
-      }
-
-      return assets;
-    };
-
-    const fetchSolanaBalances = async (address: string, accountId: string, accountLabel: string) => {
-      console.log(`[fetchSolanaBalances] Fetching for ${address}`);
-      const assets: Asset[] = [];
-
-      try {
-        const connection = new Connection('https://api.mainnet-beta.solana.com');
-        const publicKey = new PublicKey(address);
-        const balanceLamports = await connection.getBalance(publicKey);
-        const balanceSol = balanceLamports / LAMPORTS_PER_SOL;
-
-        if (balanceSol > 0) {
-          const priceUsd = await fetchPrice('SOL');
-
-          assets.push({
-            id: `${accountId}-SOL-Solana-${address}`,
-            symbol: 'SOL',
-            name: 'Solana',
-            balance: balanceSol.toString(),
-            source: accountLabel,
-            chain: 'Solana',
-            accountId: accountId,
-            priceUsd,
-            valueUsd: balanceSol * priceUsd,
-            metadata: {
-              address,
-              isMultiAccount: false
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`Error fetching Solana balance for ${address}:`, error);
-      }
-
-      return assets;
-    };
-
-    const fetchSuiBalances = async (address: string, accountId: string, accountLabel: string) => {
-      console.log(`[fetchSuiBalances] Fetching for ${address}`);
-      const assets: Asset[] = [];
-
-      try {
-        const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-        const balanceResult = await client.getBalance({ owner: address });
-        const balanceSui = Number(balanceResult.totalBalance) / Math.pow(10, SUI_DECIMALS);
-
-        if (balanceSui > 0) {
-          const priceUsd = await fetchPrice('SUI');
-
-          assets.push({
-            id: `${accountId}-SUI-SUI-${address}`,
-            symbol: 'SUI',
-            name: 'Sui',
-            balance: balanceSui.toString(),
-            source: accountLabel,
-            chain: 'SUI',
-            accountId: accountId,
-            priceUsd,
-            valueUsd: balanceSui * priceUsd,
-            metadata: {
-              address,
-              isMultiAccount: false
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`Error fetching SUI balance for ${address}:`, error);
-      }
-
-      return assets;
-    };
-
-    if (walletAccounts.length === 0) {
-      console.log('[useAccountSync] No wallet accounts, clearing assets');
-      setAssets([]);
-      calculateTotalValue();
-      lastSyncedAccountsRef.current = '';
-      return;
-    }
-
-    console.log('[useAccountSync] Beginning asset sync for', walletAccounts.length, 'accounts');
-    setIsLoading(true);
-    const allAssets: Asset[] = [];
-
-    for (const account of walletAccounts) {
-      if (!account.address) continue;
-
-      try {
-        if (account.platform === 'Multi-Chain EVM') {
-          const configuredChains = account.metadata?.detectedChains || ['Ethereum'];
-
-          for (const chainName of configuredChains) {
-            const assets = await fetchEvmBalances(
-              account.address,
-              chainName,
-              account.id,
-              account.label
-            );
-            allAssets.push(...assets);
-          }
-        } else if (account.platform === 'Solana') {
-          const assets = await fetchSolanaBalances(
-            account.address,
-            account.id,
-            account.label
-          );
-          allAssets.push(...assets);
-        } else if (account.platform === 'SUI') {
-          const assets = await fetchSuiBalances(
-            account.address,
-            account.id,
-            account.label
-          );
-          allAssets.push(...assets);
-        } else if (chainMap[account.platform]) {
-          const assets = await fetchEvmBalances(
-            account.address,
-            account.platform,
-            account.id,
-            account.label
-          );
-          allAssets.push(...assets);
-        } else {
-          console.warn(`Unknown platform: ${account.platform}`);
-        }
-
-        // Update last sync time for the account
-        updateAccount(account.id, { lastSync: new Date().toISOString() });
-      } catch (error) {
-        console.error(`Failed to sync account ${account.label}:`, error);
-        // Still update lastSync even on error
-        updateAccount(account.id, { lastSync: new Date().toISOString() });
-      }
-    }
-
-    setAssets(allAssets);
-    calculateTotalValue();
-    setIsLoading(false);
-
-    lastSyncedAccountsRef.current = accountsKey;
-  }, [walletAccounts, accountsKey, chainMap]);
+  // Keep refs in sync
+  walletAccountsRef.current = walletAccounts;
+  accountsKeyRef.current = accountsKey;
+  chainMapRef.current = chainMap;
 
   // Sync each wallet account
   useEffect(() => {
@@ -335,20 +117,314 @@ export function useAccountSync() {
       return;
     }
 
-    console.log('[useAccountSync] Starting sync for accounts:', accountsKey);
+    // Abort any in-progress sync when accounts change
+    if (syncAbortRef.current) {
+      syncAbortRef.current.abort();
+    }
 
-    syncAccounts();
+    const runSync = async () => {
+      // Prevent concurrent syncs
+      if (syncInProgressRef.current) {
+        console.log('[useAccountSync] Sync already in progress, skipping');
+        return;
+      }
+
+      const abortController = new AbortController();
+      syncAbortRef.current = abortController;
+      syncInProgressRef.current = true;
+
+      // Snapshot current values from refs
+      const currentWalletAccounts = walletAccountsRef.current;
+      const currentAccountsKey = accountsKeyRef.current;
+      const currentChainMap = chainMapRef.current;
+
+      const { setAssets, calculateTotalValue, setIsLoading } = useStore.getState();
+
+      const createEvmClient = (chainName: string) => {
+        const chainConfig = currentChainMap[chainName];
+        if (!chainConfig) {
+          console.error(`No chain config found for ${chainName}`);
+          return createPublicClient({ chain: mainnet, transport: http() });
+        }
+        return createPublicClient({ chain: chainConfig.chain, transport: http() });
+      };
+
+      const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
+        console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
+        const assets: Asset[] = [];
+
+        try {
+          const chainConfig = currentChainMap[chainName];
+          if (!chainConfig) {
+            console.warn(`No chain config for ${chainName}`);
+            return assets;
+          }
+
+          const client = createEvmClient(chainName);
+
+          const balance = await client.getBalance({
+            address: address as Address
+          });
+
+          if (abortController.signal.aborted) return assets;
+
+          if (balance > 0n) {
+            const priceUsd = await fetchPrice(chainConfig.symbol);
+            useStore.getState().updatePrice(chainConfig.symbol, priceUsd);
+
+            const formattedBalance = formatBalance(balance.toString(), 18);
+            const asset: Asset = {
+              id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
+              symbol: chainConfig.symbol,
+              name: chainConfig.name,
+              balance: formattedBalance,
+              source: accountLabel,
+              chain: chainName,
+              accountId: accountId,
+              priceUsd,
+              valueUsd: parseFloat(formattedBalance) * priceUsd,
+              metadata: {
+                address: address,
+                isMultiAccount: false
+              }
+            };
+
+            assets.push(asset);
+          }
+
+          // Fetch ERC20 token balances
+          try {
+            const response = await fetch(`https://api.ethplorer.io/getAddressInfo/${address}?apiKey=freekey`);
+            if (abortController.signal.aborted) return assets;
+            if (response.ok) {
+              const data = await response.json();
+              if (data.tokens && Array.isArray(data.tokens)) {
+                for (const token of data.tokens) {
+                  if (abortController.signal.aborted) return assets;
+                  if (!token.tokenInfo?.decimals || !token.tokenInfo?.symbol) continue;
+                  const decimals = parseInt(token.tokenInfo.decimals);
+                  if (isNaN(decimals)) continue;
+                  const tokenBalance = formatBalance(String(token.balance), decimals);
+                  if (isNaN(parseFloat(tokenBalance))) continue;
+
+                  const tokenPriceUsd = await fetchPrice(token.tokenInfo.symbol);
+                  if (tokenPriceUsd > 0) {
+                    useStore.getState().updatePrice(token.tokenInfo.symbol, tokenPriceUsd);
+                  }
+
+                  assets.push({
+                    id: `${accountId}-${token.tokenInfo.symbol}-${chainName}-${address}`,
+                    symbol: token.tokenInfo.symbol,
+                    name: token.tokenInfo.name || token.tokenInfo.symbol,
+                    balance: tokenBalance,
+                    source: accountLabel,
+                    chain: chainName,
+                    accountId: accountId,
+                    priceUsd: tokenPriceUsd,
+                    valueUsd: parseFloat(tokenBalance) * tokenPriceUsd,
+                    metadata: {
+                      address: token.tokenInfo.address,
+                      isMultiAccount: false
+                    }
+                  });
+                }
+              }
+            }
+          } catch (tokenError) {
+            console.error(`Error fetching ERC20 tokens for ${chainName} - ${address}:`, tokenError);
+          }
+
+        } catch (error) {
+          console.error(`Error fetching EVM balances for ${chainName} - ${address}:`, error);
+        }
+
+        return assets;
+      };
+
+      const fetchSolanaBalances = async (address: string, accountId: string, accountLabel: string) => {
+        console.log(`[fetchSolanaBalances] Fetching for ${address}`);
+        const assets: Asset[] = [];
+
+        try {
+          const connection = new Connection('https://api.mainnet-beta.solana.com');
+          const publicKey = new PublicKey(address);
+          const balanceLamports = await connection.getBalance(publicKey);
+          const balanceSol = balanceLamports / LAMPORTS_PER_SOL;
+
+          if (balanceSol > 0) {
+            const priceUsd = await fetchPrice('SOL');
+
+            assets.push({
+              id: `${accountId}-SOL-Solana-${address}`,
+              symbol: 'SOL',
+              name: 'Solana',
+              balance: balanceSol.toString(),
+              source: accountLabel,
+              chain: 'Solana',
+              accountId: accountId,
+              priceUsd,
+              valueUsd: balanceSol * priceUsd,
+              metadata: {
+                address,
+                isMultiAccount: false
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching Solana balance for ${address}:`, error);
+        }
+
+        return assets;
+      };
+
+      const fetchSuiBalances = async (address: string, accountId: string, accountLabel: string) => {
+        console.log(`[fetchSuiBalances] Fetching for ${address}`);
+        const assets: Asset[] = [];
+
+        try {
+          const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
+          const balanceResult = await client.getBalance({ owner: address });
+          const balanceSui = Number(balanceResult.totalBalance) / Math.pow(10, SUI_DECIMALS);
+
+          if (balanceSui > 0) {
+            const priceUsd = await fetchPrice('SUI');
+
+            assets.push({
+              id: `${accountId}-SUI-SUI-${address}`,
+              symbol: 'SUI',
+              name: 'Sui',
+              balance: balanceSui.toString(),
+              source: accountLabel,
+              chain: 'SUI',
+              accountId: accountId,
+              priceUsd,
+              valueUsd: balanceSui * priceUsd,
+              metadata: {
+                address,
+                isMultiAccount: false
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching SUI balance for ${address}:`, error);
+        }
+
+        return assets;
+      };
+
+      if (currentWalletAccounts.length === 0) {
+        console.log('[useAccountSync] No wallet accounts, clearing assets');
+        setAssets([]);
+        calculateTotalValue();
+        lastSyncedAccountsRef.current = '';
+        syncInProgressRef.current = false;
+        return;
+      }
+
+      console.log('[useAccountSync] Beginning asset sync for', currentWalletAccounts.length, 'accounts');
+      setIsLoading(true);
+      const allAssets: Asset[] = [];
+
+      // Collect lastSync updates to apply in batch after sync completes
+      const syncTimestamps: Array<{ id: string; timestamp: string }> = [];
+
+      for (const account of currentWalletAccounts) {
+        if (abortController.signal.aborted) break;
+        if (!account.address) continue;
+
+        try {
+          if (account.platform === 'Multi-Chain EVM') {
+            const configuredChains = account.metadata?.detectedChains || ['Ethereum'];
+
+            for (const chainName of configuredChains) {
+              if (abortController.signal.aborted) break;
+              const assets = await fetchEvmBalances(
+                account.address,
+                chainName,
+                account.id,
+                account.label
+              );
+              allAssets.push(...assets);
+            }
+          } else if (account.platform === 'Solana') {
+            const assets = await fetchSolanaBalances(
+              account.address,
+              account.id,
+              account.label
+            );
+            allAssets.push(...assets);
+          } else if (account.platform === 'SUI') {
+            const assets = await fetchSuiBalances(
+              account.address,
+              account.id,
+              account.label
+            );
+            allAssets.push(...assets);
+          } else if (currentChainMap[account.platform]) {
+            const assets = await fetchEvmBalances(
+              account.address,
+              account.platform,
+              account.id,
+              account.label
+            );
+            allAssets.push(...assets);
+          } else {
+            console.warn(`Unknown platform: ${account.platform}`);
+          }
+
+          syncTimestamps.push({ id: account.id, timestamp: new Date().toISOString() });
+        } catch (error) {
+          console.error(`Failed to sync account ${account.label}:`, error);
+          syncTimestamps.push({ id: account.id, timestamp: new Date().toISOString() });
+        }
+      }
+
+      // Don't update state if aborted (component unmounted or new sync started)
+      if (abortController.signal.aborted) {
+        syncInProgressRef.current = false;
+        return;
+      }
+
+      // Deduplicate assets by ID to prevent accumulation
+      const dedupedAssets = deduplicateAssets(allAssets);
+
+      // Replace all assets atomically
+      setAssets(dedupedAssets);
+      calculateTotalValue();
+      setIsLoading(false);
+
+      // Batch update lastSync timestamps after assets are set
+      // Use getState() to avoid triggering re-renders during sync
+      const { updateAccount } = useStore.getState();
+      for (const { id, timestamp } of syncTimestamps) {
+        updateAccount(id, { lastSync: timestamp });
+      }
+
+      lastSyncedAccountsRef.current = currentAccountsKey;
+      syncInProgressRef.current = false;
+    };
+
+    console.log('[useAccountSync] Starting sync for accounts:', accountsKey);
+    runSync();
 
     // Set up periodic sync
     const intervalId = setInterval(() => {
-      lastSyncedAccountsRef.current = ''; // Force re-sync
-      syncAccounts();
+      // Don't force re-sync if one is already in progress
+      if (!syncInProgressRef.current) {
+        lastSyncedAccountsRef.current = ''; // Allow re-sync
+        runSync();
+      }
     }, SYNC_INTERVAL_MS);
 
     return () => {
       clearInterval(intervalId);
+      if (syncAbortRef.current) {
+        syncAbortRef.current.abort();
+      }
     };
-  }, [accountsKey, walletAccounts, chainMap, syncAccounts]);
+    // Only depend on accountsKey (a stable string), not on walletAccounts reference or syncAccounts function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountsKey]);
 
   return {
     isLoading: useStore(state => state.isLoading),
