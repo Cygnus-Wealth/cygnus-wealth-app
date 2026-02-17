@@ -81,6 +81,7 @@ describe('useAccountSync - EVM Integration', () => {
       portfolio: { totalValue: 0, totalAssets: 0, lastUpdated: null },
       isLoading: false,
       error: null,
+      networkEnvironment: 'production',
     });
 
     mockConnect.mockResolvedValue(undefined);
