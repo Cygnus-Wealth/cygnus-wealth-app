@@ -44,6 +44,20 @@ vi.mock('viem', async () => {
   };
 });
 
+// Mock @cygnus-wealth/sol-integration facade
+vi.mock('@cygnus-wealth/sol-integration', () => ({
+  SolanaIntegrationFacade: vi.fn().mockImplementation(() => ({
+    getSolanaBalance: vi.fn().mockResolvedValue({
+      isSuccess: true,
+      getValue: () => 1.5,
+    }),
+    getTokenBalances: vi.fn().mockResolvedValue({
+      isSuccess: true,
+      getValue: () => [],
+    }),
+  })),
+}));
+
 // Mock the asset valuator
 vi.mock('@cygnus-wealth/asset-valuator', () => ({
   AssetValuator: vi.fn().mockImplementation(() => ({
