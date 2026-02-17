@@ -50,14 +50,15 @@ describe('Progressive Loading Components', () => {
 
     it('shows calculated value when not loading', () => {
       renderWithChakra(
-        <ValueCell 
-          balance="100" 
-          priceUsd={1.50} 
+        <ValueCell
+          balance="100"
+          priceUsd={1.50}
+          valueUsd={150}
           isLoadingBalance={false}
           isLoadingPrice={false}
         />
       );
-      
+
       expect(screen.getByText('$150.00')).toBeInTheDocument();
     });
 

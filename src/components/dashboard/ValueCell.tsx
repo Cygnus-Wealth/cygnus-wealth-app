@@ -22,8 +22,6 @@ export interface ValueCellProps {
 }
 
 export const ValueCell: React.FC<ValueCellProps> = ({
-  balance = 0,
-  priceUsd = null,
   valueUsd = null,
   isLoadingBalance = false,
   isLoadingPrice = false,
@@ -33,9 +31,9 @@ export const ValueCell: React.FC<ValueCellProps> = ({
   showCurrency = true,
   precision = 2
 }) => {
-  // Calculate value if not provided
-  const calculatedValue = valueUsd !== null ? valueUsd : 
-    (balance && priceUsd) ? (parseFloat(balance.toString()) * priceUsd) : null;
+  // Use the pre-calculated valueUsd; never compute from raw balance strings
+  // as they may be in wei/smallest-unit form and would produce wildly incorrect values
+  const calculatedValue = valueUsd ?? null;
 
   // Determine loading state
   const isLoading = isLoadingBalance || isLoadingPrice;
