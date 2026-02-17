@@ -245,13 +245,16 @@ export const useStore = create<AppState>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Only persist accounts and user preferences
         accounts: state.accounts.map(acc => ({
           ...acc,
           apiKey: acc.apiKey, // In production, this should be encrypted
         })),
         networkEnvironment: state.networkEnvironment,
-        // Don't persist assets or prices as they should be fresh
+        // Cache assets, prices, and portfolio for instant display on page load.
+        // Fresh data will overwrite these once useAccountSync completes.
+        assets: state.assets,
+        prices: state.prices,
+        portfolio: state.portfolio,
       }),
     }
   )

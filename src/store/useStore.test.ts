@@ -320,7 +320,7 @@ describe('useStore', () => {
   });
 
   describe('Persistence', () => {
-    it('should only persist specific fields', () => {
+    it('should persist accounts, assets, prices, portfolio and environment', () => {
       const account: Account = {
         id: 'test-account-1',
         type: 'wallet',
@@ -331,21 +331,33 @@ describe('useStore', () => {
       };
 
       useStore.getState().addAccount(account);
+      useStore.getState().addAsset({
+        id: 'asset-1',
+        accountId: 'test-account-1',
+        symbol: 'ETH',
+        name: 'Ethereum',
+        balance: '1.5',
+        chain: 'Ethereum',
+        source: 'wallet',
+        priceUsd: 2000,
+        valueUsd: 3000,
+      });
+      useStore.getState().updatePrice('ETH', 2000);
       useStore.getState().setIsLoading(true);
       useStore.getState().setError('Test error');
 
-      // The persistence is configured in the store, we can test by checking localStorage
-      // after a state change
       const storeData = localStorage.getItem('cygnus-wealth-storage');
       if (storeData) {
         const parsed = JSON.parse(storeData);
         const state = parsed.state;
         expect(state.accounts).toBeDefined();
-        // These fields should not be persisted based on the partialize function
+        expect(state.assets).toBeDefined();
+        expect(state.prices).toBeDefined();
+        expect(state.portfolio).toBeDefined();
+        expect(state.networkEnvironment).toBeDefined();
+        // Transient UI state should not be persisted
         expect(state.isLoading).toBeUndefined();
         expect(state.error).toBeUndefined();
-        expect(state.assets).toBeUndefined();
-        expect(state.portfolio).toBeUndefined();
       }
     });
   });

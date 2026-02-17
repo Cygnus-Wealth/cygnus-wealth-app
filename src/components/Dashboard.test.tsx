@@ -422,8 +422,6 @@ describe('Dashboard', () => {
 
   describe('Loading State', () => {
     it('should render assets that are still loading prices', () => {
-      // Set up an asset with a valid price so it passes the spam filter
-      // (an asset with priceUsd=0 would be hidden as "unpriced")
       const assets: Asset[] = [
         {
           id: 'asset-1',
@@ -455,6 +453,93 @@ describe('Dashboard', () => {
       expect(screen.getByText('Assets')).toBeInTheDocument();
       expect(screen.getByText('ETH')).toBeInTheDocument();
       expect(screen.getByText('0.1000')).toBeInTheDocument();
+    });
+
+    it('should show skeleton rows when loading with no assets', () => {
+      useStore.setState({
+        accounts: [{
+          id: 'account-1',
+          type: 'wallet',
+          platform: 'Ethereum',
+          label: 'Test Wallet',
+          address: '0x1234',
+          status: 'connected',
+        }],
+        assets: [],
+        isLoading: true,
+      });
+
+      renderDashboard();
+
+      // Should NOT show the empty state message
+      expect(screen.queryByText('No assets to display')).not.toBeInTheDocument();
+      // Should show the assets header
+      expect(screen.getByText('Assets')).toBeInTheDocument();
+    });
+
+    it('should show refreshing indicator when loading with cached assets', () => {
+      useStore.setState({
+        accounts: [{
+          id: 'account-1',
+          type: 'wallet',
+          platform: 'Ethereum',
+          label: 'Test Wallet',
+          address: '0x1234',
+          status: 'connected',
+        }],
+        assets: [{
+          id: 'asset-1',
+          accountId: 'account-1',
+          symbol: 'ETH',
+          name: 'Ethereum',
+          balance: '1.5',
+          chain: 'Ethereum',
+          source: 'wallet',
+          priceUsd: 2000,
+          valueUsd: 3000,
+        }],
+        isLoading: true,
+      });
+
+      renderDashboard();
+
+      expect(screen.getByText('Refreshing...')).toBeInTheDocument();
+      expect(screen.getByText('ETH')).toBeInTheDocument();
+    });
+
+    it('should show last updated time when not loading', () => {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      useStore.setState({
+        accounts: [{
+          id: 'account-1',
+          type: 'wallet',
+          platform: 'Ethereum',
+          label: 'Test Wallet',
+          address: '0x1234',
+          status: 'connected',
+        }],
+        assets: [{
+          id: 'asset-1',
+          accountId: 'account-1',
+          symbol: 'ETH',
+          name: 'Ethereum',
+          balance: '1.5',
+          chain: 'Ethereum',
+          source: 'wallet',
+          priceUsd: 2000,
+          valueUsd: 3000,
+        }],
+        portfolio: {
+          totalValue: 3000,
+          totalAssets: 1,
+          lastUpdated: fiveMinutesAgo,
+        },
+        isLoading: false,
+      });
+
+      renderDashboard();
+
+      expect(screen.getByText('Updated 5m ago')).toBeInTheDocument();
     });
   });
 
