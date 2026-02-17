@@ -13,10 +13,11 @@ import {
   IconButton,
   Grid,
   Stat,
-  Tooltip
+  Tooltip,
+  Skeleton,
 } from '@chakra-ui/react';
 import { Link } from 'react-router-dom';
-import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff, FiRefreshCw } from 'react-icons/fi';
 import { useStore } from '../store/useStore';
 import { useAccountSync } from '../hooks/useAccountSync';
 import { useProgressiveAssetLoading } from '../hooks/useProgressiveAssetLoading';
@@ -27,6 +28,17 @@ import type { Asset } from '../store/useStore';
 
 const ITEMS_PER_PAGE = 10;
 
+const spinKeyframes = `@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`;
+
+function formatTimeAgo(isoDate: string): string {
+  const seconds = Math.floor((Date.now() - new Date(isoDate).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+}
+
 export default function Dashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showHiddenTokens, setShowHiddenTokens] = useState(false);
@@ -36,6 +48,7 @@ export default function Dashboard() {
   const assets = useStore(state => state.assets);
   const portfolio = useStore(state => state.portfolio);
   const prices = useStore(state => state.prices);
+  const isLoading = useStore(state => state.isLoading);
   
   // Sync account balances
   useAccountSync();
@@ -131,6 +144,7 @@ export default function Dashboard() {
 
   return (
     <Container maxW="container.xl" py={8}>
+      <style>{spinKeyframes}</style>
       <Stack gap={8}>
         <Box textAlign="center">
           <Heading as="h1" size="4xl" mb={2}>
@@ -207,6 +221,17 @@ export default function Dashboard() {
                     }}
                   />
                 </Flex>
+                {isLoading && assets.length > 0 && (
+                  <Flex align="center" gap={2}>
+                    <Box as={FiRefreshCw} color="blue.500" style={{ animation: 'spin 1s linear infinite' }} />
+                    <Text fontSize="xs" color="gray.500">Refreshing...</Text>
+                  </Flex>
+                )}
+                {!isLoading && portfolio.lastUpdated && (
+                  <Text fontSize="xs" color="gray.400">
+                    Updated {formatTimeAgo(portfolio.lastUpdated)}
+                  </Text>
+                )}
                 {(getOverallStatus().isLoadingAnyBalance || getOverallStatus().isLoadingAnyPrice) && (
                   <Flex align="center" gap={2}>
                     <Spinner size="xs" color="blue.500" />
@@ -236,12 +261,12 @@ export default function Dashboard() {
                       const { asset, addresses, connectionInfo } = item;
                       const addressArray = Array.from(addresses);
                       const showTooltip = addressArray.length > 1;
-                      
+
                       // Format source to show account count
                       const sourceLabel = connectionInfo.accountCount > 1
                         ? `${connectionInfo.connectionType} (${connectionInfo.accountCount} accounts)`
                         : connectionInfo.connectionType;
-                      
+
                       return (
                         <Table.Row key={asset.id}>
                           <Table.Cell>
@@ -251,7 +276,7 @@ export default function Dashboard() {
                             </Stack>
                           </Table.Cell>
                           <Table.Cell textAlign="right">
-                            <SimpleBalanceCell 
+                            <SimpleBalanceCell
                               balance={asset.balance}
                               symbol={asset.symbol}
                               isLoading={getLoadingState(asset.id).isLoadingBalance}
@@ -262,9 +287,9 @@ export default function Dashboard() {
                             {showTooltip ? (
                               <Tooltip.Root>
                                 <Tooltip.Trigger asChild>
-                                  <Badge 
-                                    colorScheme="blue" 
-                                    variant="subtle" 
+                                  <Badge
+                                    colorScheme="blue"
+                                    variant="subtle"
                                     cursor="pointer"
                                     style={{ textDecoration: 'underline dotted' }}
                                   >
@@ -310,7 +335,7 @@ export default function Dashboard() {
                             )}
                           </Table.Cell>
                           <Table.Cell textAlign="right">
-                            <ValueCell 
+                            <ValueCell
                               balance={asset.balance}
                               priceUsd={prices[asset.symbol] || asset.priceUsd}
                               valueUsd={asset.valueUsd}
@@ -324,6 +349,32 @@ export default function Dashboard() {
                         </Table.Row>
                       );
                     })
+                  ) : isLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <Table.Row key={`skeleton-${i}`}>
+                        <Table.Cell>
+                          <Stack gap={1}>
+                            <Skeleton height="16px" width="60px" />
+                            <Skeleton height="12px" width="90px" />
+                          </Stack>
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          <Skeleton height="16px" width="80px" ml="auto" />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Skeleton height="20px" width="70px" />
+                        </Table.Cell>
+                        <Table.Cell>
+                          <Skeleton height="20px" width="65px" />
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          <Skeleton height="16px" width="70px" ml="auto" />
+                        </Table.Cell>
+                        <Table.Cell textAlign="right">
+                          <Skeleton height="16px" width="80px" ml="auto" />
+                        </Table.Cell>
+                      </Table.Row>
+                    ))
                   ) : (
                     <Table.Row>
                       <Table.Cell colSpan={6} textAlign="center" py={20}>
