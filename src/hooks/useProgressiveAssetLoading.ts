@@ -272,6 +272,7 @@ export const useProgressiveAssetLoading = (
   useEffect(() => {
     // Create a unique key for the current assets to check if we've already started loading
     const assetsKey = assets.map(a => a.id).join(',');
+    const timerIds: ReturnType<typeof setTimeout>[] = [];
 
     if (assets.length > 0 && loadingStartedRef.current !== assetsKey) {
       loadingStartedRef.current = assetsKey;
@@ -284,11 +285,16 @@ export const useProgressiveAssetLoading = (
         symbolsSeen.add(asset.symbol);
 
         // Stagger price loading to avoid rate limiting
-        setTimeout(() => {
+        const id = setTimeout(() => {
           loadAssetPrice(asset);
         }, index * staggerDelay);
+        timerIds.push(id);
       });
     }
+
+    return () => {
+      timerIds.forEach(id => clearTimeout(id));
+    };
   }, [assets, loadAssetPrice, staggerDelay]);
 
   return {
