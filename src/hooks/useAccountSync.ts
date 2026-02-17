@@ -65,21 +65,74 @@ function getRegistry(): InstanceType<typeof ChainRegistry> {
   return _registryInstance;
 }
 
+// Singleton AssetValuator to avoid re-creating per price call
+let _valuatorInstance: InstanceType<typeof AssetValuator> | null = null;
+function getValuator(): InstanceType<typeof AssetValuator> {
+  if (!_valuatorInstance) {
+    _valuatorInstance = new AssetValuator();
+  }
+  return _valuatorInstance;
+}
+
 const SYNC_INTERVAL_MS = 60000; // 60 seconds
 const SUI_DECIMALS = 9;
+const RPC_TIMEOUT_MS = 15000; // 15s timeout for RPC calls
+const PRICE_TIMEOUT_MS = 10000; // 10s timeout for price fetches
 
 /**
- * Fetch price for a symbol using AssetValuator.
+ * Race a promise against a timeout. Rejects with a TimeoutError if the
+ * timeout fires first.
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${label} (${ms}ms)`)), ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
+/**
+ * Fetch price for a symbol using AssetValuator singleton.
  * Returns 0 if price is not available.
  */
 async function fetchPrice(symbol: string): Promise<number> {
   try {
-    const valuator = new AssetValuator();
-    const priceData = await valuator.getPrice(symbol);
+    const valuator = getValuator();
+    const priceData = await withTimeout(
+      valuator.getPrice(symbol),
+      PRICE_TIMEOUT_MS,
+      `price(${symbol})`,
+    );
     return priceData?.price || 0;
   } catch {
     return 0;
   }
+}
+
+/**
+ * Fetch prices for multiple symbols in parallel, deduplicating symbols.
+ * Returns a map of symbol -> priceUsd.
+ */
+async function fetchPricesBatch(symbols: string[]): Promise<Record<string, number>> {
+  const unique = [...new Set(symbols)];
+  const results: Record<string, number> = {};
+
+  const settled = await Promise.allSettled(
+    unique.map(async (symbol) => {
+      const price = await fetchPrice(symbol);
+      return { symbol, price };
+    })
+  );
+
+  for (const result of settled) {
+    if (result.status === 'fulfilled') {
+      results[result.value.symbol] = result.value.price;
+    }
+  }
+
+  return results;
 }
 
 /**
@@ -170,6 +223,10 @@ export function useAccountSync() {
         return createPublicClient({ chain: chainConfig.chain, transport: http() });
       };
 
+      /**
+       * Fetch EVM balances for a single chain. Returns assets WITHOUT prices
+       * so that prices can be batch-fetched later.
+       */
       const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
         console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
         const assets: Asset[] = [];
@@ -181,20 +238,19 @@ export function useAccountSync() {
             return assets;
           }
 
-          // Fetch native balance via viem
+          // Fetch native balance via viem with timeout
           const client = createEvmClient(chainName);
-          const balance = await client.getBalance({
-            address: address as Address
-          });
+          const balance = await withTimeout(
+            client.getBalance({ address: address as Address }),
+            RPC_TIMEOUT_MS,
+            `getBalance(${chainName})`,
+          );
 
           if (abortController.signal.aborted) return assets;
 
           if (balance > 0n) {
-            const priceUsd = await fetchPrice(chainConfig.symbol);
-            useStore.getState().updatePrice(chainConfig.symbol, priceUsd);
-
             const formattedBalance = (Number(balance) / 1e18).toFixed(6).replace(/\.?0+$/, '');
-            const asset: Asset = {
+            assets.push({
               id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
               symbol: chainConfig.symbol,
               name: chainConfig.name,
@@ -202,15 +258,13 @@ export function useAccountSync() {
               source: accountLabel,
               chain: chainName,
               accountId: accountId,
-              priceUsd,
-              valueUsd: parseFloat(formattedBalance) * priceUsd,
+              priceUsd: null,
+              valueUsd: null,
               metadata: {
                 address: address,
                 isMultiAccount: false
               }
-            };
-
-            assets.push(asset);
+            });
           }
 
           // Fetch ERC20 token balances via @cygnus-wealth/evm-integration
@@ -225,11 +279,15 @@ export function useAccountSync() {
                 console.warn(`evm-integration has no adapter for ${registryName}, skipping ERC20 tokens`);
                 return assets;
               }
-              await adapter.connect();
+              await withTimeout(adapter.connect(), RPC_TIMEOUT_MS, `connect(${registryName})`);
 
               if (abortController.signal.aborted) return assets;
 
-              const tokenBalances = await adapter.getTokenBalances(address as Address);
+              const tokenBalances = await withTimeout(
+                adapter.getTokenBalances(address as Address),
+                RPC_TIMEOUT_MS,
+                `getTokenBalances(${registryName})`,
+              );
 
               for (const tokenBalance of tokenBalances) {
                 if (abortController.signal.aborted) return assets;
@@ -240,11 +298,6 @@ export function useAccountSync() {
                 const parsedBalance = parseFloat(tokenAmount);
                 if (isNaN(parsedBalance) || parsedBalance <= 0) continue;
 
-                const tokenPriceUsd = await fetchPrice(symbol);
-                if (tokenPriceUsd > 0) {
-                  useStore.getState().updatePrice(symbol, tokenPriceUsd);
-                }
-
                 assets.push({
                   id: `${accountId}-${symbol}-${chainName}-${address}`,
                   symbol,
@@ -253,8 +306,8 @@ export function useAccountSync() {
                   source: accountLabel,
                   chain: chainName,
                   accountId: accountId,
-                  priceUsd: tokenPriceUsd || null,
-                  valueUsd: tokenPriceUsd > 0 ? parsedBalance * tokenPriceUsd : null,
+                  priceUsd: null,
+                  valueUsd: null,
                   metadata: {
                     address: tokenBalance.asset.contractAddress || undefined,
                     isMultiAccount: false
@@ -280,12 +333,14 @@ export function useAccountSync() {
         try {
           const connection = new Connection('https://api.mainnet-beta.solana.com');
           const publicKey = new PublicKey(address);
-          const balanceLamports = await connection.getBalance(publicKey);
+          const balanceLamports = await withTimeout(
+            connection.getBalance(publicKey),
+            RPC_TIMEOUT_MS,
+            `solana.getBalance(${address.slice(0, 8)})`,
+          );
           const balanceSol = balanceLamports / LAMPORTS_PER_SOL;
 
           if (balanceSol > 0) {
-            const priceUsd = await fetchPrice('SOL');
-
             assets.push({
               id: `${accountId}-SOL-Solana-${address}`,
               symbol: 'SOL',
@@ -294,8 +349,8 @@ export function useAccountSync() {
               source: accountLabel,
               chain: 'Solana',
               accountId: accountId,
-              priceUsd,
-              valueUsd: balanceSol * priceUsd,
+              priceUsd: null,
+              valueUsd: null,
               metadata: {
                 address,
                 isMultiAccount: false
@@ -315,12 +370,14 @@ export function useAccountSync() {
 
         try {
           const client = new SuiClient({ url: getFullnodeUrl('mainnet') });
-          const balanceResult = await client.getBalance({ owner: address });
+          const balanceResult = await withTimeout(
+            client.getBalance({ owner: address }),
+            RPC_TIMEOUT_MS,
+            `sui.getBalance(${address.slice(0, 8)})`,
+          );
           const balanceSui = Number(balanceResult.totalBalance) / Math.pow(10, SUI_DECIMALS);
 
           if (balanceSui > 0) {
-            const priceUsd = await fetchPrice('SUI');
-
             assets.push({
               id: `${accountId}-SUI-SUI-${address}`,
               symbol: 'SUI',
@@ -329,8 +386,8 @@ export function useAccountSync() {
               source: accountLabel,
               chain: 'SUI',
               accountId: accountId,
-              priceUsd,
-              valueUsd: balanceSui * priceUsd,
+              priceUsd: null,
+              valueUsd: null,
               metadata: {
                 address,
                 isMultiAccount: false
@@ -355,59 +412,94 @@ export function useAccountSync() {
 
       console.log('[useAccountSync] Beginning asset sync for', currentWalletAccounts.length, 'accounts');
       setIsLoading(true);
-      const allAssets: Asset[] = [];
 
       // Collect lastSync updates to apply in batch after sync completes
       const syncTimestamps: Array<{ id: string; timestamp: string }> = [];
+
+      // ── Phase 1: Fetch all balances in parallel across all accounts/chains ──
+      const balancePromises: Promise<{ accountId: string; assets: Asset[] }>[] = [];
 
       for (const account of currentWalletAccounts) {
         if (abortController.signal.aborted) break;
         if (!account.address) continue;
 
-        try {
-          if (account.platform === 'Multi-Chain EVM') {
-            const configuredChains = account.metadata?.detectedChains || ['Ethereum'];
+        if (account.platform === 'Multi-Chain EVM') {
+          const configuredChains = account.metadata?.detectedChains || ['Ethereum'];
 
-            for (const chainName of configuredChains) {
-              if (abortController.signal.aborted) break;
-              const assets = await fetchEvmBalances(
-                account.address,
-                chainName,
-                account.id,
-                account.label
-              );
-              allAssets.push(...assets);
-            }
-          } else if (account.platform === 'Solana') {
-            const assets = await fetchSolanaBalances(
-              account.address,
-              account.id,
-              account.label
+          // Launch all chains for this account in parallel
+          for (const chainName of configuredChains) {
+            balancePromises.push(
+              fetchEvmBalances(account.address, chainName, account.id, account.label)
+                .then(assets => ({ accountId: account.id, assets }))
             );
-            allAssets.push(...assets);
-          } else if (account.platform === 'SUI') {
-            const assets = await fetchSuiBalances(
-              account.address,
-              account.id,
-              account.label
-            );
-            allAssets.push(...assets);
-          } else if (currentChainMap[account.platform]) {
-            const assets = await fetchEvmBalances(
-              account.address,
-              account.platform,
-              account.id,
-              account.label
-            );
-            allAssets.push(...assets);
-          } else {
-            console.warn(`Unknown platform: ${account.platform}`);
           }
+        } else if (account.platform === 'Solana') {
+          balancePromises.push(
+            fetchSolanaBalances(account.address, account.id, account.label)
+              .then(assets => ({ accountId: account.id, assets }))
+          );
+        } else if (account.platform === 'SUI') {
+          balancePromises.push(
+            fetchSuiBalances(account.address, account.id, account.label)
+              .then(assets => ({ accountId: account.id, assets }))
+          );
+        } else if (currentChainMap[account.platform]) {
+          balancePromises.push(
+            fetchEvmBalances(account.address, account.platform, account.id, account.label)
+              .then(assets => ({ accountId: account.id, assets }))
+          );
+        } else {
+          console.warn(`Unknown platform: ${account.platform}`);
+        }
+      }
 
-          syncTimestamps.push({ id: account.id, timestamp: new Date().toISOString() });
-        } catch (error) {
-          console.error(`Failed to sync account ${account.label}:`, error);
-          syncTimestamps.push({ id: account.id, timestamp: new Date().toISOString() });
+      // Wait for ALL balance fetches to complete (or fail individually)
+      const balanceResults = await Promise.allSettled(balancePromises);
+
+      if (abortController.signal.aborted) {
+        syncInProgressRef.current = false;
+        return;
+      }
+
+      // Collect all assets and track which accounts completed
+      const allAssets: Asset[] = [];
+      const completedAccountIds = new Set<string>();
+
+      for (const result of balanceResults) {
+        if (result.status === 'fulfilled') {
+          allAssets.push(...result.value.assets);
+          completedAccountIds.add(result.value.accountId);
+        }
+      }
+
+      // Record sync timestamps for completed accounts
+      const now = new Date().toISOString();
+      for (const accountId of completedAccountIds) {
+        syncTimestamps.push({ id: accountId, timestamp: now });
+      }
+
+      // ── Phase 2: Batch-fetch all prices in parallel ──
+      const symbolsToPrice = [...new Set(allAssets.map(a => a.symbol))];
+      const priceMap = await fetchPricesBatch(symbolsToPrice);
+
+      if (abortController.signal.aborted) {
+        syncInProgressRef.current = false;
+        return;
+      }
+
+      // Apply prices to assets and update the price store
+      const { updatePrice } = useStore.getState();
+      for (const [symbol, price] of Object.entries(priceMap)) {
+        if (price > 0) {
+          updatePrice(symbol, price);
+        }
+      }
+
+      for (const asset of allAssets) {
+        const price = priceMap[asset.symbol] ?? 0;
+        asset.priceUsd = price;
+        if (price > 0) {
+          asset.valueUsd = parseFloat(asset.balance) * price;
         }
       }
 
