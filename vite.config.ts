@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     nodePolyfills({
       // To add only specific polyfills, add them here. If no option is passed, adds all polyfills
-      include: ['buffer'],
+      include: ['buffer', 'stream', 'crypto'],
       globals: {
         Buffer: true,
         global: true,
@@ -21,7 +21,8 @@ export default defineConfig({
       '@cygnus-wealth/asset-valuator',
       '@cygnus-wealth/evm-integration',
       '@cygnus-wealth/data-models',
-      '@cygnus-wealth/wallet-integration-system'
+      '@cygnus-wealth/wallet-integration-system',
+      '@cygnus-wealth/sol-integration'
     ],
     esbuildOptions: {
       target: 'es2020'

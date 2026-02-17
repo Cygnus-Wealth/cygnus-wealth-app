@@ -66,21 +66,21 @@ vi.mock('@cygnus-wealth/wallet-integration-system', () => ({
   })
 }));
 
-// Mock Solana web3.js
-vi.mock('@solana/web3.js', () => ({
-  Connection: vi.fn().mockImplementation(() => ({
-    getBalance: vi.fn().mockResolvedValue(1500000000), // 1.5 SOL in lamports
-    getLatestBlockhash: vi.fn().mockResolvedValue({ blockhash: 'test-blockhash' }),
-    getParsedTokenAccountsByOwner: vi.fn().mockResolvedValue({
-      value: [] // No token accounts for simplicity
-    }),
-    getHealth: vi.fn().mockResolvedValue('ok'),
+// Helper to create mock Result objects matching the sol-integration Result API
+function mockResultOk<T>(value: T) {
+  return { isSuccess: true, isFailure: false, getValue: () => value, getError: () => { throw new Error('No error'); } };
+}
+function mockResultFail<E>(error: E) {
+  return { isSuccess: false, isFailure: true, getValue: () => { throw new Error('No value'); }, getError: () => error };
+}
+
+// Mock @cygnus-wealth/sol-integration facade
+vi.mock('@cygnus-wealth/sol-integration', () => ({
+  SolanaIntegrationFacade: vi.fn().mockImplementation(() => ({
+    getSolanaBalance: vi.fn().mockResolvedValue(mockResultOk(1.5)),
+    getTokenBalances: vi.fn().mockResolvedValue(mockResultOk([])),
+    getPortfolio: vi.fn().mockResolvedValue(mockResultOk({ solBalance: 1.5, tokens: [], nfts: [] })),
   })),
-  PublicKey: vi.fn().mockImplementation((key) => ({ 
-    toString: () => key,
-    toBase58: () => key 
-  })),
-  LAMPORTS_PER_SOL: 1000000000,
 }));
 
 // Mock SUI SDK
@@ -134,8 +134,7 @@ describe('useAccountSync - Solana & SUI', () => {
   });
 
   describe('Solana Integration', () => {
-    // Skipped: hook currently skips Solana — sol-integration library not yet available
-    it.skip('should sync Solana wallet balances', async () => {
+    it('should sync Solana wallet balances via sol-integration facade', async () => {
       const solanaAccount: Account = {
         id: 'sol-account-1',
         type: 'wallet',
@@ -151,23 +150,23 @@ describe('useAccountSync - Solana & SUI', () => {
       useStore.setState({ accounts: [solanaAccount] });
 
       renderHook(() => useAccountSync());
-      
+
       // Wait for sync to complete
       await new Promise(resolve => setTimeout(resolve, 200));
 
       const assets = useStore.getState().assets;
       expect(assets).toHaveLength(1);
-      
+
       const solAsset = assets[0];
       expect(solAsset.symbol).toBe('SOL');
       expect(solAsset.name).toBe('Solana');
-      expect(solAsset.balance).toBe('1.5'); // 1500000000 / 1e9
+      expect(solAsset.balance).toBe('1.5');
       expect(solAsset.priceUsd).toBe(50);
       expect(solAsset.valueUsd).toBe(75); // 1.5 * 50
       expect(solAsset.chain).toBe('Solana');
     });
 
-    it.skip('should handle multiple Solana accounts', async () => {
+    it('should handle multiple Solana accounts', async () => {
       const accounts: Account[] = [
         {
           id: 'sol-account-1',
@@ -195,19 +194,56 @@ describe('useAccountSync - Solana & SUI', () => {
       });
 
       const { unmount } = renderHook(() => useAccountSync());
-      
+
       // Give more time for async operations
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
       expect(assets).toHaveLength(2);
-      
+
       unmount();
-      
+
       // Check both accounts have SOL
       expect(assets.every(a => a.symbol === 'SOL')).toBe(true);
       expect(assets[0].accountId).toBe('sol-account-1');
       expect(assets[1].accountId).toBe('sol-account-2');
+    });
+
+    it('should handle sol-integration errors gracefully', async () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Override the mock to return a failure
+      const { SolanaIntegrationFacade } = await import('@cygnus-wealth/sol-integration');
+      (SolanaIntegrationFacade as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+        getSolanaBalance: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
+        getTokenBalances: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
+      }));
+
+      const solanaAccount: Account = {
+        id: 'sol-account-1',
+        type: 'wallet',
+        platform: 'Solana',
+        label: 'Phantom Wallet',
+        address: '7EYnhQoR9YM3N7UoaKRoA44Uy8JeaZV3qyouov87awMs',
+        status: 'connected',
+      };
+
+      useStore.setState({ accounts: [solanaAccount] });
+
+      renderHook(() => useAccountSync());
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // No assets should be added on failure
+      expect(useStore.getState().assets).toHaveLength(0);
+
+      consoleErrorSpy.mockRestore();
+
+      // Reset mock back to success
+      (SolanaIntegrationFacade as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
+        getSolanaBalance: vi.fn().mockResolvedValue(mockResultOk(1.5)),
+        getTokenBalances: vi.fn().mockResolvedValue(mockResultOk([])),
+      }));
     });
   });
 
@@ -234,15 +270,15 @@ describe('useAccountSync - Solana & SUI', () => {
       });
 
       const { unmount } = renderHook(() => useAccountSync());
-      
+
       // Give more time for async operations
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
       expect(assets).toHaveLength(1);
-      
+
       unmount();
-      
+
       const suiAsset = assets[0];
       expect(suiAsset.symbol).toBe('SUI');
       expect(suiAsset.name).toBe('Sui');
@@ -292,7 +328,7 @@ describe('useAccountSync - Solana & SUI', () => {
   });
 
   describe('Mixed Chain Accounts', () => {
-    // Skipped: hook currently skips Solana/SUI platforms
+    // Skipped: SUI tests still skipped pending sui-integration
     it.skip('should sync EVM, Solana, and SUI accounts together', async () => {
       // Reset SUI mock to return valid data
       const { SuiClient } = await import('@mysten/sui.js/client');
@@ -324,18 +360,18 @@ describe('useAccountSync - Solana & SUI', () => {
       useStore.setState({ accounts });
 
       renderHook(() => useAccountSync());
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const assets = useStore.getState().assets;
       console.log('Assets found:', assets.map(a => ({ symbol: a.symbol, chain: a.chain })));
       expect(assets).toHaveLength(2);
-      
+
       // Check we have one of each asset type
       const symbols = assets.map(a => a.symbol);
       expect(symbols).toContain('SOL');
       expect(symbols).toContain('SUI');
-      
+
       // Check portfolio totals
       const portfolio = useStore.getState().portfolio;
       expect(portfolio.totalAssets).toBe(2);
@@ -375,14 +411,14 @@ describe('useAccountSync - Solana & SUI', () => {
       useStore.setState({ accounts });
 
       renderHook(() => useAccountSync());
-      
+
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const portfolio = useStore.getState().portfolio;
       const assets = useStore.getState().assets;
-      
+
       // Expect 1 asset per account since each has only the native token
-      expect(assets).toHaveLength(2); 
+      expect(assets).toHaveLength(2);
       expect(portfolio.totalAssets).toBe(2);
       expect(portfolio.totalValue).toBe(78); // (1.5 * 50) + (2.5 * 1.2) = 75 + 3 = 78
       expect(portfolio.lastUpdated).toBeTruthy();
