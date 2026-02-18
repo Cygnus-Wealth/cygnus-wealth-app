@@ -11,8 +11,8 @@ test.describe('Portfolio Management Flow', () => {
     await expect(page.locator('text=Your complete crypto portfolio overview')).toBeVisible();
 
     // Check portfolio summary shows zeros
-    await expect(page.locator('text=$0.00')).toBeVisible();
     await expect(page.locator('text=Total Portfolio Value')).toBeVisible();
+    await expect(page.locator('dl').filter({ hasText: 'Total Portfolio Value' }).locator('dd').first()).toHaveText('$0.00');
 
     // Check empty state message
     await expect(page.locator('text=No assets to display')).toBeVisible();
