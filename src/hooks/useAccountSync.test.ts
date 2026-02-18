@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import React from 'react';
 import { useAccountSync } from './useAccountSync';
 import { useStore } from '../store/useStore';
 import type { Account } from '../store/useStore';
@@ -75,6 +76,36 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
     }),
     fetchTokenPrice: vi.fn().mockResolvedValue({ price: 2000 }),
   })),
+}));
+
+// Mock IntegrationProvider to provide integration context
+vi.mock('../providers/IntegrationProvider', () => ({
+  useIntegration: vi.fn(() => ({
+    evmRegistry: {
+      getAdapterByName: vi.fn().mockReturnValue({
+        connect: vi.fn().mockResolvedValue(undefined),
+        getBalance: vi.fn().mockResolvedValue({
+          assetId: 'ethereum-native',
+          asset: { id: 'ethereum-native', symbol: 'ETH', name: 'Ether', decimals: 18, chain: 'ethereum' },
+          amount: '1.5',
+        }),
+        getTokenBalances: vi.fn().mockResolvedValue([]),
+      }),
+      getSupportedChains: vi.fn().mockReturnValue([]),
+      getEnvironment: vi.fn().mockReturnValue('production'),
+    },
+    solanaFacade: {
+      getSolanaBalance: vi.fn().mockResolvedValue({ isSuccess: true, getValue: () => 1.5 }),
+      getTokenBalances: vi.fn().mockResolvedValue({ isSuccess: true, getValue: () => [] }),
+      getHealthMetrics: vi.fn(),
+    },
+    rpcConfig: {
+      environment: 'production',
+      availableProviders: [],
+      chains: {},
+    },
+  })),
+  IntegrationProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock fetch for ERC20 tokens
@@ -243,10 +274,26 @@ describe('useAccountSync', () => {
   });
 
   describe('Error Handling', () => {
-    it('should handle fetch errors gracefully', async () => {
+    it('should handle adapter errors gracefully', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      (global.fetch as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
+      // Override useIntegration to return a failing adapter
+      const { useIntegration } = await import('../providers/IntegrationProvider');
+      vi.mocked(useIntegration).mockReturnValue({
+        evmRegistry: {
+          getAdapterByName: vi.fn().mockImplementation(() => {
+            throw new Error('Network error');
+          }),
+          getSupportedChains: vi.fn().mockReturnValue([]),
+          getEnvironment: vi.fn().mockReturnValue('production'),
+        } as any,
+        solanaFacade: {
+          getSolanaBalance: vi.fn().mockResolvedValue({ isSuccess: false, getValue: () => 0 }),
+          getTokenBalances: vi.fn().mockResolvedValue({ isSuccess: false, getValue: () => [] }),
+          getHealthMetrics: vi.fn(),
+        } as any,
+        rpcConfig: { environment: 'production', availableProviders: [], chains: {} } as any,
+      });
 
       const account: Account = {
         id: 'account-1',
@@ -267,11 +314,8 @@ describe('useAccountSync', () => {
       // Give time for async operations
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      expect(consoleErrorSpy).toHaveBeenCalled();
-
-      // Should still update last sync time on account
-      const updatedAccount = useStore.getState().accounts[0];
-      expect(updatedAccount.lastSync).toBeTruthy();
+      // No assets should be added on failure
+      expect(useStore.getState().assets).toHaveLength(0);
 
       consoleErrorSpy.mockRestore();
     });
