@@ -2,41 +2,36 @@ import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import type { Asset } from '../store/useStore';
 import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
-import { createPublicClient, http, type Address, type Chain } from 'viem';
-import { mainnet, polygon, arbitrum, optimism, sepolia, polygonAmoy, arbitrumSepolia, optimismSepolia } from 'viem/chains';
-import { base } from 'viem/chains';
-import { localhost } from 'viem/chains';
+import type { Address } from 'viem';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
-import { ChainRegistry } from '@cygnus-wealth/evm-integration';
 import type { IChainAdapter } from '@cygnus-wealth/evm-integration';
-import { SolanaIntegrationFacade } from '@cygnus-wealth/sol-integration';
+import { useIntegration } from '../providers/IntegrationProvider';
 
 // Chain mapping for EVM chains
 interface ChainMapEntry {
-  chain: Chain;
   chainId: number;
   symbol: string;
   name: string;
 }
 
 const productionChainMap: Record<string, ChainMapEntry> = {
-  'Ethereum': { chain: mainnet, chainId: 1, symbol: 'ETH', name: 'Ethereum' },
-  'Polygon': { chain: polygon, chainId: 137, symbol: 'MATIC', name: 'Polygon' },
-  'Arbitrum': { chain: arbitrum, chainId: 42161, symbol: 'ETH', name: 'Arbitrum Ethereum' },
-  'Optimism': { chain: optimism, chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' },
-  'Base': { chain: base, chainId: 8453, symbol: 'ETH', name: 'Base Ethereum' },
+  'Ethereum': { chainId: 1, symbol: 'ETH', name: 'Ethereum' },
+  'Polygon': { chainId: 137, symbol: 'MATIC', name: 'Polygon' },
+  'Arbitrum': { chainId: 42161, symbol: 'ETH', name: 'Arbitrum Ethereum' },
+  'Optimism': { chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' },
+  'Base': { chainId: 8453, symbol: 'ETH', name: 'Base Ethereum' },
 };
 
 const testnetChainMap: Record<string, ChainMapEntry> = {
-  'Ethereum': { chain: sepolia, chainId: 11155111, symbol: 'ETH', name: 'Sepolia ETH' },
-  'Polygon': { chain: polygonAmoy, chainId: 80002, symbol: 'MATIC', name: 'Polygon Amoy' },
-  'Arbitrum': { chain: arbitrumSepolia, chainId: 421614, symbol: 'ETH', name: 'Arbitrum Sepolia' },
-  'Optimism': { chain: optimismSepolia, chainId: 11155420, symbol: 'ETH', name: 'Optimism Sepolia' },
+  'Ethereum': { chainId: 11155111, symbol: 'ETH', name: 'Sepolia ETH' },
+  'Polygon': { chainId: 80002, symbol: 'MATIC', name: 'Polygon Amoy' },
+  'Arbitrum': { chainId: 421614, symbol: 'ETH', name: 'Arbitrum Sepolia' },
+  'Optimism': { chainId: 11155420, symbol: 'ETH', name: 'Optimism Sepolia' },
 };
 
 const localChainMap: Record<string, ChainMapEntry> = {
-  'Ethereum': { chain: localhost, chainId: 1337, symbol: 'ETH', name: 'Localhost' },
+  'Ethereum': { chainId: 1337, symbol: 'ETH', name: 'Localhost' },
 };
 
 function getChainMap(env: NetworkEnvironment): Record<string, ChainMapEntry> {
@@ -55,15 +50,6 @@ const chainNameToRegistryName: Record<string, string> = {
   'Optimism': 'Optimism',
   'Base': 'Base',
 };
-
-// Create a ChainRegistry instance for ERC20 token discovery
-let _registryInstance: InstanceType<typeof ChainRegistry> | null = null;
-function getRegistry(): InstanceType<typeof ChainRegistry> {
-  if (!_registryInstance) {
-    _registryInstance = new ChainRegistry();
-  }
-  return _registryInstance;
-}
 
 // Singleton AssetValuator to avoid re-creating per price call
 let _valuatorInstance: InstanceType<typeof AssetValuator> | null = null;
@@ -152,6 +138,9 @@ export function useAccountSync() {
   const accounts = useStore(state => state.accounts);
   const networkEnvironment = useStore(state => state.networkEnvironment);
 
+  // Get integration services from context (Phase 6 wiring)
+  const { evmRegistry, solanaFacade } = useIntegration();
+
   const chainMap = useMemo(() => getChainMap(networkEnvironment), [networkEnvironment]);
 
   // Get all wallet accounts with a stable reference based on content
@@ -175,11 +164,15 @@ export function useAccountSync() {
   const walletAccountsRef = useRef(walletAccounts);
   const accountsKeyRef = useRef(accountsKey);
   const chainMapRef = useRef(chainMap);
+  const evmRegistryRef = useRef(evmRegistry);
+  const solanaFacadeRef = useRef(solanaFacade);
 
   // Keep refs in sync
   walletAccountsRef.current = walletAccounts;
   accountsKeyRef.current = accountsKey;
   chainMapRef.current = chainMap;
+  evmRegistryRef.current = evmRegistry;
+  solanaFacadeRef.current = solanaFacade;
 
   // Sync each wallet account
   useEffect(() => {
@@ -211,21 +204,14 @@ export function useAccountSync() {
       const currentWalletAccounts = walletAccountsRef.current;
       const currentAccountsKey = accountsKeyRef.current;
       const currentChainMap = chainMapRef.current;
+      const registry = evmRegistryRef.current;
+      const facade = solanaFacadeRef.current;
 
       const { setAssets, calculateTotalValue, setIsLoading } = useStore.getState();
 
-      const createEvmClient = (chainName: string) => {
-        const chainConfig = currentChainMap[chainName];
-        if (!chainConfig) {
-          console.error(`No chain config found for ${chainName}`);
-          return createPublicClient({ chain: mainnet, transport: http() });
-        }
-        return createPublicClient({ chain: chainConfig.chain, transport: http() });
-      };
-
       /**
-       * Fetch EVM balances for a single chain. Returns assets WITHOUT prices
-       * so that prices can be batch-fetched later.
+       * Fetch EVM balances for a single chain using the integration registry.
+       * Returns assets WITHOUT prices so that prices can be batch-fetched later.
        */
       const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
         console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
@@ -238,23 +224,41 @@ export function useAccountSync() {
             return assets;
           }
 
-          // Fetch native balance via viem with timeout
-          const client = createEvmClient(chainName);
-          const balance = await withTimeout(
-            client.getBalance({ address: address as Address }),
+          // Fetch native balance via evm-integration registry adapter
+          const registryName = chainNameToRegistryName[chainName];
+          if (!registryName) {
+            console.warn(`No registry mapping for ${chainName}, skipping`);
+            return assets;
+          }
+
+          let adapter: IChainAdapter;
+          try {
+            adapter = registry.getAdapterByName(registryName);
+          } catch {
+            console.warn(`evm-integration has no adapter for ${registryName}, skipping`);
+            return assets;
+          }
+
+          await withTimeout(adapter.connect(), RPC_TIMEOUT_MS, `connect(${registryName})`);
+
+          if (abortController.signal.aborted) return assets;
+
+          // Fetch native balance via adapter
+          const nativeBalance = await withTimeout(
+            adapter.getBalance(address as Address),
             RPC_TIMEOUT_MS,
-            `getBalance(${chainName})`,
+            `getBalance(${registryName})`,
           );
 
           if (abortController.signal.aborted) return assets;
 
-          if (balance > 0n) {
-            const formattedBalance = (Number(balance) / 1e18).toFixed(6).replace(/\.?0+$/, '');
+          const parsedNativeBalance = parseFloat(nativeBalance.amount);
+          if (parsedNativeBalance > 0) {
             assets.push({
               id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
               symbol: chainConfig.symbol,
               name: chainConfig.name,
-              balance: formattedBalance,
+              balance: nativeBalance.amount,
               source: accountLabel,
               chain: chainName,
               accountId: accountId,
@@ -267,58 +271,38 @@ export function useAccountSync() {
             });
           }
 
-          // Fetch ERC20 token balances via @cygnus-wealth/evm-integration
-          const registryName = chainNameToRegistryName[chainName];
-          if (registryName) {
-            try {
-              const registry = getRegistry();
-              let adapter: IChainAdapter;
-              try {
-                adapter = registry.getAdapterByName(registryName);
-              } catch {
-                console.warn(`evm-integration has no adapter for ${registryName}, skipping ERC20 tokens`);
-                return assets;
+          // Fetch ERC20 token balances via adapter
+          const tokenBalances = await withTimeout(
+            adapter.getTokenBalances(address as Address),
+            RPC_TIMEOUT_MS,
+            `getTokenBalances(${registryName})`,
+          );
+
+          for (const tokenBalance of tokenBalances) {
+            if (abortController.signal.aborted) return assets;
+
+            const symbol = tokenBalance.asset.symbol;
+            const name = tokenBalance.asset.name || symbol;
+            const tokenAmount = tokenBalance.amount;
+            const parsedBalance = parseFloat(tokenAmount);
+            if (isNaN(parsedBalance) || parsedBalance <= 0) continue;
+
+            assets.push({
+              id: `${accountId}-${symbol}-${chainName}-${address}`,
+              symbol,
+              name,
+              balance: tokenAmount,
+              source: accountLabel,
+              chain: chainName,
+              accountId: accountId,
+              priceUsd: null,
+              valueUsd: null,
+              metadata: {
+                address: tokenBalance.asset.contractAddress || undefined,
+                isMultiAccount: false
               }
-              await withTimeout(adapter.connect(), RPC_TIMEOUT_MS, `connect(${registryName})`);
-
-              if (abortController.signal.aborted) return assets;
-
-              const tokenBalances = await withTimeout(
-                adapter.getTokenBalances(address as Address),
-                RPC_TIMEOUT_MS,
-                `getTokenBalances(${registryName})`,
-              );
-
-              for (const tokenBalance of tokenBalances) {
-                if (abortController.signal.aborted) return assets;
-
-                const symbol = tokenBalance.asset.symbol;
-                const name = tokenBalance.asset.name || symbol;
-                const tokenAmount = tokenBalance.amount;
-                const parsedBalance = parseFloat(tokenAmount);
-                if (isNaN(parsedBalance) || parsedBalance <= 0) continue;
-
-                assets.push({
-                  id: `${accountId}-${symbol}-${chainName}-${address}`,
-                  symbol,
-                  name,
-                  balance: tokenAmount,
-                  source: accountLabel,
-                  chain: chainName,
-                  accountId: accountId,
-                  priceUsd: null,
-                  valueUsd: null,
-                  metadata: {
-                    address: tokenBalance.asset.contractAddress || undefined,
-                    isMultiAccount: false
-                  }
-                });
-              }
-            } catch (tokenError) {
-              console.error(`Error fetching ERC20 tokens for ${chainName} - ${address}:`, tokenError);
-            }
+            });
           }
-
         } catch (error) {
           console.error(`Error fetching EVM balances for ${chainName} - ${address}:`, error);
         }
@@ -331,9 +315,7 @@ export function useAccountSync() {
         const assets: Asset[] = [];
 
         try {
-          const env: NetworkEnvironment = networkEnvironment === 'testnet' ? 'testnet' : networkEnvironment === 'local' ? 'local' : 'production';
-          const facade = new SolanaIntegrationFacade({ environment: env });
-
+          // Use the shared facade from IntegrationProvider (Phase 6)
           const balanceResult = await withTimeout(
             facade.getSolanaBalance(address),
             RPC_TIMEOUT_MS,
