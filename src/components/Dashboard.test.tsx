@@ -5,10 +5,16 @@ import { ChakraProvider, defaultSystem } from '@chakra-ui/react';
 import Dashboard from './Dashboard';
 import { useStore } from '../store/useStore';
 import type { Account, Asset } from '../store/useStore';
+import type { Chain } from '@cygnus-wealth/data-models';
 
 // Mock the useAccountSync hook
 vi.mock('../hooks/useAccountSync', () => ({
   useAccountSync: vi.fn(),
+}));
+
+// Mock the DeFi position service (needed by useDeFiPositions hook)
+vi.mock('../domain/defi/DeFiPositionService', () => ({
+  getDeFiPositions: vi.fn(() => []),
 }));
 
 const renderDashboard = () => {
@@ -32,6 +38,9 @@ describe('Dashboard', () => {
         totalAssets: 0,
         lastUpdated: null,
       },
+      defiPositions: [],
+      isLoadingDeFi: false,
+      defiError: null,
       isLoading: false,
       error: null,
     });
@@ -50,8 +59,11 @@ describe('Dashboard', () => {
     it('should show zero values in portfolio summary', () => {
       renderDashboard();
 
-      expect(screen.getByText('$0.00')).toBeInTheDocument(); // Total value
-      expect(screen.getAllByText('0')).toHaveLength(2); // Total assets and connected accounts
+      // Total portfolio value and DeFi value both show $0.00
+      const zeroValues = screen.getAllByText('$0.00');
+      expect(zeroValues.length).toBeGreaterThanOrEqual(2);
+      // Total assets and connected accounts show 0
+      expect(screen.getAllByText('0')).toHaveLength(2);
     });
   });
 
@@ -623,6 +635,80 @@ describe('Dashboard', () => {
       // Check the results synchronously
       expect(screen.queryByText('TOKEN0')).not.toBeInTheDocument();
       expect(screen.getByText('TOKEN10')).toBeInTheDocument();
+    });
+  });
+
+  describe('DeFi Positions Section', () => {
+    it('should render DeFi Positions section', () => {
+      renderDashboard();
+      expect(screen.getByText('DeFi Positions')).toBeInTheDocument();
+    });
+
+    it('should show empty state when no DeFi positions', () => {
+      renderDashboard();
+      expect(screen.getByText('No DeFi positions found')).toBeInTheDocument();
+    });
+
+    it('should display DeFi Value stat in portfolio summary', () => {
+      renderDashboard();
+      expect(screen.getByText('DeFi Value')).toBeInTheDocument();
+      expect(screen.getByText('0 positions')).toBeInTheDocument();
+    });
+
+    it('should include DeFi value in total portfolio value', () => {
+      useStore.setState({
+        portfolio: {
+          totalValue: 5000,
+          totalAssets: 2,
+          lastUpdated: null,
+        },
+        defiPositions: [
+          {
+            id: 'defi-1',
+            protocol: 'Lido',
+            positionType: 'staking',
+            label: 'ETH Staking',
+            chain: 'ETHEREUM' as Chain,
+            underlyingAssets: [{ symbol: 'ETH', name: 'Ethereum', amount: '10' }],
+            valueUsd: 20000,
+            apy: 4.2,
+            discoverySource: 'on-chain',
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      // Total should be 5000 + 20000 = 25000
+      expect(screen.getByText('$25000.00')).toBeInTheDocument();
+      // DeFi value stat
+      expect(screen.getByText('$20000.00')).toBeInTheDocument();
+      expect(screen.getByText('1 positions')).toBeInTheDocument();
+    });
+
+    it('should display DeFi positions when present in store', () => {
+      useStore.setState({
+        defiPositions: [
+          {
+            id: 'defi-1',
+            protocol: 'Uniswap V3',
+            positionType: 'lp',
+            label: 'ETH/USDC',
+            chain: 'ETHEREUM' as Chain,
+            underlyingAssets: [
+              { symbol: 'ETH', name: 'Ethereum', amount: '5' },
+              { symbol: 'USDC', name: 'USD Coin', amount: '10000' },
+            ],
+            valueUsd: 20000,
+            discoverySource: 'subgraph',
+          },
+        ],
+      });
+
+      renderDashboard();
+
+      expect(screen.getByText('Uniswap V3')).toBeInTheDocument();
+      expect(screen.getByText('ETH/USDC')).toBeInTheDocument();
     });
   });
 });
