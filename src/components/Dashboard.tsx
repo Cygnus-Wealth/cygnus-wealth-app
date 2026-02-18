@@ -21,8 +21,10 @@ import { FiChevronLeft, FiChevronRight, FiPlus, FiEye, FiEyeOff, FiRefreshCw } f
 import { useStore } from '../store/useStore';
 import { useAccountSync } from '../hooks/useAccountSync';
 import { useProgressiveAssetLoading } from '../hooks/useProgressiveAssetLoading';
+import { useDeFiPositions } from '../hooks/useDeFiPositions';
 import { SimpleBalanceCell } from './dashboard/SimpleBalanceCell';
 import { ValueCell } from './dashboard/ValueCell';
+import { DeFiPositions } from './dashboard/DeFiPositions';
 import { shouldHideByDefault } from '../utils/spamFilter';
 import type { Asset } from '../store/useStore';
 
@@ -55,7 +57,10 @@ export default function Dashboard() {
   
   // Progressive loading for individual assets
   const { getLoadingState, getOverallStatus } = useProgressiveAssetLoading(assets);
-  
+
+  // DeFi positions
+  const { defiPositions, isLoadingDeFi, totalDeFiValue } = useDeFiPositions();
+
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
@@ -162,15 +167,15 @@ export default function Dashboard() {
               Portfolio Summary
             </Heading>
             
-            <Grid templateColumns={{ base: '1fr', md: 'repeat(3, 1fr)' }} gap={6}>
+            <Grid templateColumns={{ base: '1fr', md: 'repeat(4, 1fr)' }} gap={6}>
               <Stat.Root>
                 <Stat.Label color="gray.600">Total Portfolio Value</Stat.Label>
                 <Stat.ValueText fontSize="3xl">
-                  ${portfolio.totalValue.toFixed(2)}
+                  ${(portfolio.totalValue + totalDeFiValue).toFixed(2)}
                 </Stat.ValueText>
                 <Stat.HelpText>USD</Stat.HelpText>
               </Stat.Root>
-              
+
               <Stat.Root>
                 <Stat.Label color="gray.600">Total Assets</Stat.Label>
                 <Stat.ValueText fontSize="3xl">
@@ -178,7 +183,15 @@ export default function Dashboard() {
                 </Stat.ValueText>
                 <Stat.HelpText>Across all accounts</Stat.HelpText>
               </Stat.Root>
-              
+
+              <Stat.Root>
+                <Stat.Label color="gray.600">DeFi Value</Stat.Label>
+                <Stat.ValueText fontSize="3xl">
+                  ${totalDeFiValue.toFixed(2)}
+                </Stat.ValueText>
+                <Stat.HelpText>{defiPositions.length} positions</Stat.HelpText>
+              </Stat.Root>
+
               <Stat.Root>
                 <Stat.Label color="gray.600">Connected Accounts</Stat.Label>
                 <Stat.ValueText fontSize="3xl">
@@ -446,6 +459,12 @@ export default function Dashboard() {
             )}
           </Stack>
         </Box>
+
+        {/* DeFi Positions */}
+        <DeFiPositions
+          positions={defiPositions}
+          isLoading={isLoadingDeFi}
+        />
 
       </Stack>
     </Container>
