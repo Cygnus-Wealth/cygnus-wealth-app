@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Balance, NetworkEnvironment } from '@cygnus-wealth/data-models';
 import { detectEnvironment } from '../config/environment';
+import type { DeFiPosition } from '../domain/defi/DeFiPosition';
 
 /** Persistence key is namespaced by environment so data never leaks across networks */
 const detectedEnv = detectEnvironment();
@@ -113,6 +114,14 @@ interface AppState {
   prices: Record<string, number>;
   updatePrice: (symbol: string, price: number) => void;
   
+  // DeFi Positions
+  defiPositions: DeFiPosition[];
+  setDeFiPositions: (positions: DeFiPosition[]) => void;
+  isLoadingDeFi: boolean;
+  setIsLoadingDeFi: (loading: boolean) => void;
+  defiError: string | null;
+  setDeFiError: (error: string | null) => void;
+
   // UI State
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
@@ -136,6 +145,9 @@ export const useStore = create<AppState>()(
         lastUpdated: null,
       },
       prices: {},
+      defiPositions: [],
+      isLoadingDeFi: false,
+      defiError: null,
       isLoading: false,
       error: null,
 
@@ -237,6 +249,11 @@ export const useStore = create<AppState>()(
           prices: { ...state.prices, [symbol]: price },
         })),
 
+      // DeFi Position actions
+      setDeFiPositions: (positions) => set({ defiPositions: positions }),
+      setIsLoadingDeFi: (loading) => set({ isLoadingDeFi: loading }),
+      setDeFiError: (error) => set({ defiError: error }),
+
       // UI State actions
       setIsLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
@@ -255,6 +272,7 @@ export const useStore = create<AppState>()(
         assets: state.assets,
         prices: state.prices,
         portfolio: state.portfolio,
+        defiPositions: state.defiPositions,
       }),
     }
   )
