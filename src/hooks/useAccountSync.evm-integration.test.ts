@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import React from 'react';
 import { useAccountSync } from './useAccountSync';
 import { useStore } from '../store/useStore';
 import type { Account } from '../store/useStore';
@@ -62,6 +63,28 @@ vi.mock('@cygnus-wealth/evm-integration', () => ({
     getAdapterByName: mockGetAdapterByName,
     getSupportedChains: mockGetSupportedChains,
   })),
+}));
+
+// Mock IntegrationProvider to provide integration context
+vi.mock('../providers/IntegrationProvider', () => ({
+  useIntegration: vi.fn(() => ({
+    evmRegistry: {
+      getAdapterByName: mockGetAdapterByName,
+      getSupportedChains: mockGetSupportedChains,
+      getEnvironment: vi.fn().mockReturnValue('production'),
+    },
+    solanaFacade: {
+      getSolanaBalance: vi.fn().mockResolvedValue({ isSuccess: false, getValue: () => 0 }),
+      getTokenBalances: vi.fn().mockResolvedValue({ isSuccess: false, getValue: () => [] }),
+      getHealthMetrics: vi.fn(),
+    },
+    rpcConfig: {
+      environment: 'production',
+      availableProviders: [],
+      chains: {},
+    },
+  })),
+  IntegrationProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 // Mock fetch to ensure we're NOT using Ethplorer

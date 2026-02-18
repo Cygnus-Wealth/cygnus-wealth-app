@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
+import React from 'react';
 import { useAccountSync } from './useAccountSync';
 import { useStore } from '../store/useStore';
 import type { Account } from '../store/useStore';
@@ -107,6 +108,32 @@ vi.mock('@cygnus-wealth/asset-valuator', () => ({
   })),
 }));
 
+// Mock IntegrationProvider to provide integration context
+vi.mock('../providers/IntegrationProvider', () => ({
+  useIntegration: vi.fn(() => ({
+    evmRegistry: {
+      getAdapterByName: vi.fn().mockReturnValue({
+        connect: vi.fn().mockResolvedValue(undefined),
+        getBalance: vi.fn().mockResolvedValue({ amount: '0' }),
+        getTokenBalances: vi.fn().mockResolvedValue([]),
+      }),
+      getSupportedChains: vi.fn().mockReturnValue([]),
+      getEnvironment: vi.fn().mockReturnValue('production'),
+    },
+    solanaFacade: {
+      getSolanaBalance: vi.fn().mockResolvedValue(mockResultOk(1.5)),
+      getTokenBalances: vi.fn().mockResolvedValue(mockResultOk([])),
+      getHealthMetrics: vi.fn(),
+    },
+    rpcConfig: {
+      environment: 'production',
+      availableProviders: [],
+      chains: {},
+    },
+  })),
+  IntegrationProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 describe('useAccountSync - Solana & SUI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -212,12 +239,25 @@ describe('useAccountSync - Solana & SUI', () => {
     it('should handle sol-integration errors gracefully', async () => {
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Override the mock to return a failure
-      const { SolanaIntegrationFacade } = await import('@cygnus-wealth/sol-integration');
-      (SolanaIntegrationFacade as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-        getSolanaBalance: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
-        getTokenBalances: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
-      }));
+      // Override useIntegration to return a failing Solana facade
+      const { useIntegration } = await import('../providers/IntegrationProvider');
+      vi.mocked(useIntegration).mockReturnValue({
+        evmRegistry: {
+          getAdapterByName: vi.fn().mockReturnValue({
+            connect: vi.fn().mockResolvedValue(undefined),
+            getBalance: vi.fn().mockResolvedValue({ amount: '0' }),
+            getTokenBalances: vi.fn().mockResolvedValue([]),
+          }),
+          getSupportedChains: vi.fn().mockReturnValue([]),
+          getEnvironment: vi.fn().mockReturnValue('production'),
+        } as any,
+        solanaFacade: {
+          getSolanaBalance: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
+          getTokenBalances: vi.fn().mockResolvedValue(mockResultFail({ message: 'RPC error' })),
+          getHealthMetrics: vi.fn(),
+        } as any,
+        rpcConfig: { environment: 'production', availableProviders: [], chains: {} } as any,
+      });
 
       const solanaAccount: Account = {
         id: 'sol-account-1',
@@ -238,12 +278,6 @@ describe('useAccountSync - Solana & SUI', () => {
       expect(useStore.getState().assets).toHaveLength(0);
 
       consoleErrorSpy.mockRestore();
-
-      // Reset mock back to success
-      (SolanaIntegrationFacade as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => ({
-        getSolanaBalance: vi.fn().mockResolvedValue(mockResultOk(1.5)),
-        getTokenBalances: vi.fn().mockResolvedValue(mockResultOk([])),
-      }));
     });
   });
 

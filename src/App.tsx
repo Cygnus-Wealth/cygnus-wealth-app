@@ -5,12 +5,12 @@ import Settings from './components/Settings'
 import Connections from './components/settings/Connections'
 import WalletDetails from './components/settings/WalletDetails'
 import Layout from './components/Layout'
-import { EvmProvider } from './providers/EvmProvider'
+import { IntegrationProvider } from './providers/IntegrationProvider'
 
 function App() {
   return (
     <ChakraProvider value={defaultSystem}>
-      <EvmProvider>
+      <IntegrationProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Layout />}>
@@ -22,7 +22,7 @@ function App() {
             </Route>
           </Routes>
         </BrowserRouter>
-      </EvmProvider>
+      </IntegrationProvider>
     </ChakraProvider>
   )
 }
