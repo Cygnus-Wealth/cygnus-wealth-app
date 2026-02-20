@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     nodePolyfills({
       // To add only specific polyfills, add them here. If no option is passed, adds all polyfills
-      include: ['buffer', 'stream', 'crypto'],
+      include: ['buffer', 'stream', 'crypto', 'util'],
       globals: {
         Buffer: true,
         global: true,

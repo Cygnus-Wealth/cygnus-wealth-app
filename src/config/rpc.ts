@@ -10,7 +10,6 @@ export const RPC_ENDPOINTS = {
   // Solana RPC endpoints (handled by wallet-integration-system)
   // NOTE: Only use HTTPS URLs - the wallet-integration-system will handle WebSocket conversion internally
   solana: [
-    'https://rpc.ankr.com/solana', // Ankr's free tier - more reliable for SPL tokens
     'https://solana.publicnode.com',
     'https://api.mainnet-beta.solana.com', // Official Solana RPC
     'https://solana-mainnet.rpc.extrnode.com' // Alternative public RPC
