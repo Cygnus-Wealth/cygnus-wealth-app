@@ -1,11 +1,11 @@
 import { useEffect, useRef, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import type { Asset } from '../store/useStore';
+import type { Asset, Token } from '../store/useStore';
 import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
 import type { Address } from 'viem';
 import { SuiClient, getFullnodeUrl } from '@mysten/sui.js/client';
 import { AssetValuator } from '@cygnus-wealth/asset-valuator';
-import type { IChainAdapter } from '@cygnus-wealth/evm-integration';
+import type { IChainAdapter, TokenConfig } from '@cygnus-wealth/evm-integration';
 import { useIntegration } from '../providers/IntegrationProvider';
 
 // Chain mapping for EVM chains
@@ -21,6 +21,8 @@ const productionChainMap: Record<string, ChainMapEntry> = {
   'Arbitrum': { chainId: 42161, symbol: 'ETH', name: 'Arbitrum Ethereum' },
   'Optimism': { chainId: 10, symbol: 'ETH', name: 'Optimism Ethereum' },
   'Base': { chainId: 8453, symbol: 'ETH', name: 'Base Ethereum' },
+  'BSC': { chainId: 56, symbol: 'BNB', name: 'BNB Chain' },
+  'Avalanche': { chainId: 43114, symbol: 'AVAX', name: 'Avalanche' },
 };
 
 const testnetChainMap: Record<string, ChainMapEntry> = {
@@ -49,7 +51,91 @@ const chainNameToRegistryName: Record<string, string> = {
   'Arbitrum': 'Arbitrum One',
   'Optimism': 'Optimism',
   'Base': 'Base',
+  'BSC': 'BSC',
+  'Avalanche': 'Avalanche',
 };
+
+// Well-known ERC20 tokens per chain for comprehensive discovery.
+// The evm-integration library's default popular list only includes USDC, USDT, DAI.
+// We supplement it with commonly-held tokens so that balances like WETH and PYUSD are discovered.
+const WELL_KNOWN_TOKENS: Record<string, TokenConfig[]> = {
+  'Ethereum': [
+    { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as Address, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+    { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' as Address, symbol: 'USDT', decimals: 6, name: 'Tether USD' },
+    { address: '0x6B175474E89094C44Da98b954EedeAC495271d0F' as Address, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+    { address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' as Address, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+    { address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599' as Address, symbol: 'WBTC', decimals: 8, name: 'Wrapped BTC' },
+    { address: '0x6c3ea9036406852006290770BEdFcAbA0e23A0e8' as Address, symbol: 'PYUSD', decimals: 6, name: 'PayPal USD' },
+    { address: '0x514910771AF9Ca656af840dff83E8264EcF986CA' as Address, symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+    { address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984' as Address, symbol: 'UNI', decimals: 18, name: 'Uniswap' },
+    { address: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84' as Address, symbol: 'stETH', decimals: 18, name: 'Lido Staked Ether' },
+    { address: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9' as Address, symbol: 'AAVE', decimals: 18, name: 'Aave' },
+  ],
+  'Polygon': [
+    { address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359' as Address, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+    { address: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174' as Address, symbol: 'USDC.e', decimals: 6, name: 'Bridged USD Coin' },
+    { address: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F' as Address, symbol: 'USDT', decimals: 6, name: 'Tether USD' },
+    { address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063' as Address, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+    { address: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619' as Address, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+    { address: '0x1BFD67037B42Cf73acF2047067bd4F2C47D9BfD6' as Address, symbol: 'WBTC', decimals: 8, name: 'Wrapped BTC' },
+    { address: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270' as Address, symbol: 'WMATIC', decimals: 18, name: 'Wrapped Matic' },
+    { address: '0x53E0bca35eC356BD5ddDFebbD1Fc0fD03FaBad39' as Address, symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+  ],
+  'Arbitrum': [
+    { address: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831' as Address, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+    { address: '0xFF970A61A04b1cA14834A43f5dE4533eBDDB5CC8' as Address, symbol: 'USDC.e', decimals: 6, name: 'Bridged USD Coin' },
+    { address: '0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9' as Address, symbol: 'USDT', decimals: 6, name: 'Tether USD' },
+    { address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1' as Address, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+    { address: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1' as Address, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+    { address: '0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f' as Address, symbol: 'WBTC', decimals: 8, name: 'Wrapped BTC' },
+    { address: '0x912CE59144191C1204E64559FE8253a0e49E6548' as Address, symbol: 'ARB', decimals: 18, name: 'Arbitrum' },
+    { address: '0xf97f4df75117a78c1A5a0DBb814Af92458539FB4' as Address, symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+  ],
+  'Optimism': [
+    { address: '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85' as Address, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+    { address: '0x7F5c764cBc14f9669B88837ca1490cCa17c31607' as Address, symbol: 'USDC.e', decimals: 6, name: 'Bridged USD Coin' },
+    { address: '0x94b008aA00579c1307B0EF2c499aD98a8ce58e58' as Address, symbol: 'USDT', decimals: 6, name: 'Tether USD' },
+    { address: '0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1' as Address, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+    { address: '0x4200000000000000000000000000000000000006' as Address, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+    { address: '0x68f180fcCe6836688e9084f035309E29Bf0A2095' as Address, symbol: 'WBTC', decimals: 8, name: 'Wrapped BTC' },
+    { address: '0x4200000000000000000000000000000000000042' as Address, symbol: 'OP', decimals: 18, name: 'Optimism' },
+    { address: '0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6' as Address, symbol: 'LINK', decimals: 18, name: 'Chainlink' },
+  ],
+  'Base': [
+    { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as Address, symbol: 'USDC', decimals: 6, name: 'USD Coin' },
+    { address: '0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA' as Address, symbol: 'USDbC', decimals: 6, name: 'Bridged USD Coin' },
+    { address: '0x4200000000000000000000000000000000000006' as Address, symbol: 'WETH', decimals: 18, name: 'Wrapped Ether' },
+    { address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb' as Address, symbol: 'DAI', decimals: 18, name: 'Dai Stablecoin' },
+    { address: '0x2Ae3F1Ec7F1F5012CFEab0185bfc7aa3cf0DEc22' as Address, symbol: 'cbETH', decimals: 18, name: 'Coinbase Wrapped Staked ETH' },
+  ],
+};
+
+/**
+ * Build a deduplicated token list by merging well-known tokens for the chain
+ * with any user-configured tokens from the account.
+ */
+function buildTokenList(chainName: string, chainId: number, accountTokens: Token[]): TokenConfig[] {
+  const wellKnown = WELL_KNOWN_TOKENS[chainName] || [];
+  const userConfigs: TokenConfig[] = accountTokens
+    .filter(t => t.chainId === chainId)
+    .map(t => ({
+      address: t.address as Address,
+      symbol: t.symbol,
+      decimals: t.decimals,
+      name: t.name,
+    }));
+
+  const seen = new Set<string>();
+  const result: TokenConfig[] = [];
+  for (const token of [...wellKnown, ...userConfigs]) {
+    const key = token.address.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(token);
+    }
+  }
+  return result;
+}
 
 // Singleton AssetValuator to avoid re-creating per price call
 let _valuatorInstance: InstanceType<typeof AssetValuator> | null = null;
@@ -213,7 +299,7 @@ export function useAccountSync() {
        * Fetch EVM balances for a single chain using the integration registry.
        * Returns assets WITHOUT prices so that prices can be batch-fetched later.
        */
-      const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string) => {
+      const fetchEvmBalances = async (address: string, chainName: string, accountId: string, accountLabel: string, accountTokens: Token[]) => {
         console.log(`[fetchEvmBalances] Fetching for ${address} on ${chainName}`);
         const assets: Asset[] = [];
 
@@ -252,13 +338,14 @@ export function useAccountSync() {
 
           if (abortController.signal.aborted) return assets;
 
-          const parsedNativeBalance = parseFloat(nativeBalance.amount);
-          if (parsedNativeBalance > 0) {
+          // Use formatted value from value.amount (human-readable) with fallback to raw amount for tests
+          const formattedNativeBalance = nativeBalance.value?.amount ?? parseFloat(nativeBalance.amount);
+          if (formattedNativeBalance > 0) {
             assets.push({
               id: `${accountId}-${chainConfig.symbol}-${chainName}-${address}`,
               symbol: chainConfig.symbol,
               name: chainConfig.name,
-              balance: nativeBalance.amount,
+              balance: formattedNativeBalance.toString(),
               source: accountLabel,
               chain: chainName,
               accountId: accountId,
@@ -271,9 +358,12 @@ export function useAccountSync() {
             });
           }
 
-          // Fetch ERC20 token balances via adapter
+          // Build comprehensive token list from well-known tokens + user-configured tokens
+          const tokenList = buildTokenList(chainName, chainConfig.chainId, accountTokens);
+
+          // Fetch ERC20 token balances via adapter with our expanded token list
           const tokenBalances = await withTimeout(
-            adapter.getTokenBalances(address as Address),
+            adapter.getTokenBalances(address as Address, tokenList.length > 0 ? tokenList : undefined),
             RPC_TIMEOUT_MS,
             `getTokenBalances(${registryName})`,
           );
@@ -283,15 +373,15 @@ export function useAccountSync() {
 
             const symbol = tokenBalance.asset.symbol;
             const name = tokenBalance.asset.name || symbol;
-            const tokenAmount = tokenBalance.amount;
-            const parsedBalance = parseFloat(tokenAmount);
-            if (isNaN(parsedBalance) || parsedBalance <= 0) continue;
+            // Use formatted value from value.amount (human-readable) with fallback to raw amount
+            const formattedAmount = tokenBalance.value?.amount ?? parseFloat(tokenBalance.amount);
+            if (isNaN(formattedAmount) || formattedAmount <= 0) continue;
 
             assets.push({
               id: `${accountId}-${symbol}-${chainName}-${address}`,
               symbol,
               name,
-              balance: tokenAmount,
+              balance: formattedAmount.toString(),
               source: accountLabel,
               chain: chainName,
               accountId: accountId,
@@ -442,7 +532,7 @@ export function useAccountSync() {
           // Launch all chains for this account in parallel
           for (const chainName of configuredChains) {
             balancePromises.push(
-              fetchEvmBalances(account.address, chainName, account.id, account.label)
+              fetchEvmBalances(account.address, chainName, account.id, account.label, account.tokens || [])
                 .then(assets => ({ accountId: account.id, assets }))
             );
           }
@@ -458,7 +548,7 @@ export function useAccountSync() {
           );
         } else if (currentChainMap[account.platform]) {
           balancePromises.push(
-            fetchEvmBalances(account.address, account.platform, account.id, account.label)
+            fetchEvmBalances(account.address, account.platform, account.id, account.label, account.tokens || [])
               .then(assets => ({ accountId: account.id, assets }))
           );
         } else {

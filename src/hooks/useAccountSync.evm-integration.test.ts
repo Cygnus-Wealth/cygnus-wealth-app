@@ -215,6 +215,141 @@ describe('useAccountSync - EVM Integration', () => {
     });
   });
 
+  describe('Expanded token discovery', () => {
+    it('should pass well-known token list to getTokenBalances for Ethereum', async () => {
+      const account: Account = {
+        id: 'account-1',
+        type: 'wallet',
+        platform: 'Multi-Chain EVM',
+        label: 'Test Wallet',
+        address: '0x1234567890123456789012345678901234567890',
+        status: 'connected',
+        metadata: { detectedChains: ['Ethereum'] },
+      };
+
+      useStore.setState({ accounts: [account] });
+      renderHook(() => useAccountSync());
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // getTokenBalances should have been called with a token list (not undefined)
+      expect(mockGetTokenBalances).toHaveBeenCalled();
+      const tokenListArg = mockGetTokenBalances.mock.calls[0][1];
+      expect(tokenListArg).toBeDefined();
+      expect(Array.isArray(tokenListArg)).toBe(true);
+
+      // Should include WETH and PYUSD in the token list
+      const symbols = tokenListArg.map((t: { symbol: string }) => t.symbol);
+      expect(symbols).toContain('WETH');
+      expect(symbols).toContain('PYUSD');
+      expect(symbols).toContain('USDC');
+      expect(symbols).toContain('USDT');
+    });
+
+    it('should discover WETH and PYUSD when adapter returns them', async () => {
+      mockGetTokenBalances.mockResolvedValue([
+        {
+          assetId: 'ethereum-usdc',
+          asset: { id: 'ethereum-usdc', symbol: 'USDC', name: 'USD Coin', decimals: 6, chain: 'ethereum', contractAddress: '0xa0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+          amount: '1000',
+        },
+        {
+          assetId: 'ethereum-weth',
+          asset: { id: 'ethereum-weth', symbol: 'WETH', name: 'Wrapped Ether', decimals: 18, chain: 'ethereum', contractAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2' },
+          amount: '2.5',
+        },
+        {
+          assetId: 'ethereum-pyusd',
+          asset: { id: 'ethereum-pyusd', symbol: 'PYUSD', name: 'PayPal USD', decimals: 6, chain: 'ethereum', contractAddress: '0x6c3ea9036406852006290770BEdFcAbA0e23A0e8' },
+          amount: '500',
+        },
+      ]);
+
+      const account: Account = {
+        id: 'account-1',
+        type: 'wallet',
+        platform: 'Multi-Chain EVM',
+        label: 'Test Wallet',
+        address: '0x1234567890123456789012345678901234567890',
+        status: 'connected',
+        metadata: { detectedChains: ['Ethereum'] },
+      };
+
+      useStore.setState({ accounts: [account] });
+      renderHook(() => useAccountSync());
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const assets = useStore.getState().assets;
+      const symbols = assets.map(a => a.symbol);
+      expect(symbols).toContain('WETH');
+      expect(symbols).toContain('PYUSD');
+      expect(symbols).toContain('USDC');
+    });
+
+    it('should merge user-configured tokens with well-known tokens', async () => {
+      const account: Account = {
+        id: 'account-1',
+        type: 'wallet',
+        platform: 'Multi-Chain EVM',
+        label: 'Test Wallet',
+        address: '0x1234567890123456789012345678901234567890',
+        status: 'connected',
+        metadata: { detectedChains: ['Ethereum'] },
+        tokens: [
+          { address: '0x1111111111111111111111111111111111111111', symbol: 'CUSTOM', name: 'Custom Token', decimals: 18, chainId: 1 },
+        ],
+      };
+
+      useStore.setState({ accounts: [account] });
+      renderHook(() => useAccountSync());
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const tokenListArg = mockGetTokenBalances.mock.calls[0][1];
+      const symbols = tokenListArg.map((t: { symbol: string }) => t.symbol);
+      expect(symbols).toContain('CUSTOM');
+      expect(symbols).toContain('WETH');
+    });
+
+    it('should use formatted value.amount when available', async () => {
+      // Simulate what the real evm-integration returns: raw bigint in amount, formatted in value.amount
+      mockGetBalance.mockResolvedValue({
+        assetId: 'ethereum-native',
+        asset: { id: 'ethereum-native', symbol: 'ETH', name: 'Ether', decimals: 18, chain: 'ethereum' },
+        amount: '1500000000000000000', // raw bigint
+        value: { amount: 1.5, currency: 'USD', timestamp: new Date() },
+      });
+      mockGetTokenBalances.mockResolvedValue([
+        {
+          assetId: 'ethereum-usdc',
+          asset: { id: 'ethereum-usdc', symbol: 'USDC', name: 'USD Coin', decimals: 6, chain: 'ethereum', contractAddress: '0xa0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+          amount: '1000000000', // raw bigint (1000 USDC with 6 decimals)
+          value: { amount: 1000, currency: 'USD', timestamp: new Date() },
+        },
+      ]);
+
+      const account: Account = {
+        id: 'account-1',
+        type: 'wallet',
+        platform: 'Multi-Chain EVM',
+        label: 'Test Wallet',
+        address: '0x1234567890123456789012345678901234567890',
+        status: 'connected',
+        metadata: { detectedChains: ['Ethereum'] },
+      };
+
+      useStore.setState({ accounts: [account] });
+      renderHook(() => useAccountSync());
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const assets = useStore.getState().assets;
+      const ethAsset = assets.find(a => a.symbol === 'ETH');
+      const usdcAsset = assets.find(a => a.symbol === 'USDC');
+
+      // Should use formatted values, not raw bigints
+      expect(ethAsset?.balance).toBe('1.5');
+      expect(usdcAsset?.balance).toBe('1000');
+    });
+  });
+
   describe('Unsupported chain handling', () => {
     it('should warn but not crash for unsupported chains like BSC', async () => {
       mockGetAdapterByName.mockImplementation((name: string) => {
@@ -234,6 +369,35 @@ describe('useAccountSync - EVM Integration', () => {
         address: '0x1234567890123456789012345678901234567890',
         status: 'connected',
         metadata: { detectedChains: ['Ethereum', 'BSC'] },
+      };
+
+      useStore.setState({ accounts: [account] });
+      renderHook(() => useAccountSync());
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const assets = useStore.getState().assets;
+      const ethAssets = assets.filter(a => a.chain === 'Ethereum');
+      expect(ethAssets.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('should warn but not crash for unsupported chains like Avalanche', async () => {
+      mockGetAdapterByName.mockImplementation((name: string) => {
+        if (name === 'Avalanche') throw new Error('Chain not supported');
+        return {
+          connect: mockConnect,
+          getBalance: mockGetBalance,
+          getTokenBalances: mockGetTokenBalances,
+        };
+      });
+
+      const account: Account = {
+        id: 'account-1',
+        type: 'wallet',
+        platform: 'Multi-Chain EVM',
+        label: 'Test Wallet',
+        address: '0x1234567890123456789012345678901234567890',
+        status: 'connected',
+        metadata: { detectedChains: ['Ethereum', 'Avalanche'] },
       };
 
       useStore.setState({ accounts: [account] });
