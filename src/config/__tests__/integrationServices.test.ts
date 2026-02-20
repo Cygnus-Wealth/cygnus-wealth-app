@@ -64,7 +64,7 @@ function makeConfig(overrides: Partial<RpcProviderConfig> = {}): RpcProviderConf
         chainName: 'Solana',
         endpoints: [
           { url: 'https://mainnet.helius-rpc.com/?api-key=helius-key', provider: 'helius', type: 'http' },
-          { url: 'https://rpc.ankr.com/solana', provider: 'public', type: 'http' },
+          { url: 'https://solana.publicnode.com', provider: 'public', type: 'http' },
         ],
       },
     },
@@ -121,7 +121,7 @@ describe('integrationServices', () => {
       const urls = extractSolanaEndpoints(config);
       expect(urls).toEqual([
         'https://mainnet.helius-rpc.com/?api-key=helius-key',
-        'https://rpc.ankr.com/solana',
+        'https://solana.publicnode.com',
       ]);
     });
 
@@ -198,7 +198,7 @@ describe('integrationServices', () => {
         environment: 'production',
         rpcEndpoints: [
           'https://mainnet.helius-rpc.com/?api-key=helius-key',
-          'https://rpc.ankr.com/solana',
+          'https://solana.publicnode.com',
         ],
       });
     });

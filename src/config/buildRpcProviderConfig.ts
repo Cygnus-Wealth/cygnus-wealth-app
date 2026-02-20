@@ -121,7 +121,7 @@ const PUBLIC_ENDPOINTS: Record<string, string[]> = {
   '11155420': ['https://sepolia.optimism.io'],
   '84532': ['https://sepolia.base.org'],
   // Solana
-  'solana-mainnet': ['https://rpc.ankr.com/solana', 'https://solana.publicnode.com', 'https://api.mainnet-beta.solana.com'],
+  'solana-mainnet': ['https://solana.publicnode.com', 'https://api.mainnet-beta.solana.com'],
   'solana-devnet': ['https://api.devnet.solana.com'],
   // Local
   '1337': ['http://localhost:8545'],
