@@ -33,7 +33,7 @@ export const SOLANA_RPC_PROVIDERS: RpcProvider[] = [
   {
     name: 'Ankr',
     url: 'https://rpc.ankr.com/solana',
-    requiresApiKey: false,
+    requiresApiKey: true, // Free tier blocked (403), requires premium API key
     cors: false, // Limited CORS support
     docs: 'https://www.ankr.com/rpc/solana/'
   },

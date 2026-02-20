@@ -133,7 +133,6 @@ export class RpcConfigurationService {
           name: 'QuickNode', 
           isHealthy: true 
         },
-        { url: 'https://rpc.ankr.com/solana', name: 'Ankr', isHealthy: true },
         { url: 'https://solana.publicnode.com', name: 'PublicNode', isHealthy: true },
         { url: 'https://api.mainnet-beta.solana.com', name: 'Solana Official', isHealthy: true }
       ],
@@ -317,7 +316,7 @@ export class RpcConfigurationService {
    */
   public getNextHealthyEndpoint(chain: SupportedChain, currentUrl?: string): string | null {
     const healthyEndpoints = this.getHealthyEndpoints(chain);
-    
+
     if (healthyEndpoints.length === 0) {
       return null;
     }
@@ -326,9 +325,17 @@ export class RpcConfigurationService {
       return healthyEndpoints[0].url;
     }
 
+    // If only one healthy endpoint and it's the current one, no fallback available
+    if (healthyEndpoints.length === 1 && healthyEndpoints[0].url === currentUrl) {
+      return null;
+    }
+
     const currentIndex = healthyEndpoints.findIndex(ep => ep.url === currentUrl);
-    if (currentIndex === -1 || currentIndex === healthyEndpoints.length - 1) {
-      return healthyEndpoints[0].url; // Wrap around to first endpoint
+    if (currentIndex === -1) {
+      return healthyEndpoints[0].url;
+    }
+    if (currentIndex === healthyEndpoints.length - 1) {
+      return healthyEndpoints[0].url; // Wrap around to first healthy endpoint
     }
 
     return healthyEndpoints[currentIndex + 1].url;

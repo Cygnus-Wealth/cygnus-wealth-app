@@ -64,16 +64,19 @@ export class SolanaChainService {
   }
 
   /**
-   * Reconnect to a different RPC endpoint
+   * Reconnect to a different RPC endpoint.
+   * Returns true if a new endpoint was found, false if all endpoints are exhausted.
    */
-  private async reconnect(): Promise<void> {
+  private async reconnect(): Promise<boolean> {
     const currentUrl = rpcConfigService.getActiveEndpoint('solana');
     const nextUrl = rpcConfigService.getNextHealthyEndpoint('solana', currentUrl);
-    
+
     if (nextUrl && nextUrl !== currentUrl) {
       rpcConfigService.setActiveEndpoint('solana', nextUrl);
       this.connection = this.createConnection();
+      return true;
     }
+    return false;
   }
 
   /**
@@ -102,18 +105,21 @@ export class SolanaChainService {
       } catch (error) {
         lastError = error as Error;
         const currentUrl = rpcConfigService.getActiveEndpoint('solana');
-        
+
         // Mark endpoint as unhealthy
         rpcConfigService.updateEndpointHealth('solana', currentUrl, false);
-        
+
         // If this is the last attempt, don't try to reconnect
         if (attempt === this.maxRetries) {
           break;
         }
-        
-        // Try to reconnect to a different endpoint
-        await this.reconnect();
-        
+
+        // Try to reconnect to a different endpoint; stop if all are exhausted
+        const switched = await this.reconnect();
+        if (!switched) {
+          break;
+        }
+
         // Wait before retry (exponential backoff)
         await this.delay(Math.pow(2, attempt - 1) * 1000);
       }
