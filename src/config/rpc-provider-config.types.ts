@@ -1,53 +1,45 @@
 /**
  * RPC Provider Configuration Types
  *
- * Defines the shape of multi-provider, per-chain RPC fallback configuration.
- * These types will migrate to @cygnus-wealth/data-models once Phase 1 publishes them.
+ * Re-exports canonical types from @cygnus-wealth/rpc-infrastructure
+ * and defines app-specific extensions.
  */
 
 import type { NetworkEnvironment } from '@cygnus-wealth/data-models';
 
-/** Supported RPC provider identifiers */
-export type RpcProviderName =
-  | 'alchemy'
-  | 'drpc'
-  | 'helius'
-  | 'infura'
-  | 'quicknode'
-  | 'ankr'
-  | 'public';
+// Re-export enums (value + type)
+export { RpcProviderRole, RpcProviderType } from '@cygnus-wealth/rpc-infrastructure';
 
-/** A single RPC endpoint with its provider metadata */
-export interface ProviderEndpoint {
-  /** Full URL ready for use (API key already interpolated) */
-  url: string;
-  /** Which provider this endpoint belongs to */
-  provider: RpcProviderName;
-  /** Connection type */
-  type: 'http' | 'ws';
-}
+// Re-export interfaces (type-only)
+export type {
+  RpcEndpointConfig,
+  ChainRpcConfig,
+  RpcProviderConfig,
+  CircuitBreakerConfig,
+  RetryConfig,
+  HealthCheckConfig,
+  UserRpcEndpoint,
+  UserRpcConfig,
+  PrivacyConfig,
+} from '@cygnus-wealth/rpc-infrastructure';
 
-/** Per-chain endpoint list ordered by fallback priority (index 0 = highest priority) */
-export interface ChainEndpoints {
-  /** Numeric chain ID for EVM chains, or string identifier for non-EVM (e.g. 'solana-mainnet') */
-  chainId: string;
-  /** Human-readable chain name */
-  chainName: string;
-  /** Ordered fallback list — first healthy endpoint wins */
-  endpoints: ProviderEndpoint[];
-}
+import type { RpcProviderConfig } from '@cygnus-wealth/rpc-infrastructure';
 
-/** Top-level config returned by buildRpcProviderConfig */
-export interface RpcProviderConfig {
-  /** Environment this config was built for */
+/** Extended config with environment context for downstream consumers */
+export interface AppRpcProviderConfig extends RpcProviderConfig {
+  /** Network environment this config was built for */
   environment: NetworkEnvironment;
-  /** Per-chain fallback chains keyed by chain identifier */
-  chains: Record<string, ChainEndpoints>;
-  /** Which provider API keys were detected at build time */
-  availableProviders: RpcProviderName[];
 }
 
-/** Environment variable names we read */
+/** Options for buildRpcProviderConfig */
+export interface BuildRpcConfigOptions {
+  /** Env vars containing API keys (defaults to import.meta.env at runtime) */
+  envVars?: Record<string, string | undefined>;
+  /** Optional user-provided RPC endpoint overrides */
+  userConfig?: import('@cygnus-wealth/rpc-infrastructure').UserRpcConfig;
+}
+
+/** Environment variable names we read for managed provider API keys */
 export const RPC_ENV_KEYS = {
   ALCHEMY: 'VITE_CYGNUS_RPC_ALCHEMY_KEY',
   DRPC: 'VITE_CYGNUS_RPC_DRPC_KEY',
