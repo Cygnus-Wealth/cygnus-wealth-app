@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { RpcProviderConfig } from '../rpc-provider-config.types';
+import { RpcProviderRole, RpcProviderType } from '../rpc-provider-config.types';
+import type { AppRpcProviderConfig } from '../rpc-provider-config.types';
 
 // Mock hoisted functions
 const {
@@ -38,35 +39,103 @@ import { createEvmIntegration, createSolIntegration, extractEvmEndpoints, extrac
 import { ChainRegistry } from '@cygnus-wealth/evm-integration';
 import { SolanaIntegrationFacade } from '@cygnus-wealth/sol-integration';
 
-function makeConfig(overrides: Partial<RpcProviderConfig> = {}): RpcProviderConfig {
+function makeConfig(overrides: Partial<AppRpcProviderConfig> = {}): AppRpcProviderConfig {
   return {
     environment: 'production',
-    availableProviders: ['alchemy'],
     chains: {
       '1': {
-        chainId: '1',
+        chainId: 1,
         chainName: 'Ethereum',
         endpoints: [
-          { url: 'https://eth-mainnet.g.alchemy.com/v2/test-key', provider: 'alchemy', type: 'http' },
-          { url: 'https://cloudflare-eth.com', provider: 'public', type: 'http' },
+          {
+            url: 'https://eth-mainnet.gateway.pokt.network/v1/lb/libre',
+            provider: 'POKT Gateway',
+            role: RpcProviderRole.PRIMARY,
+            type: RpcProviderType.DECENTRALIZED,
+            rateLimitRps: 50,
+            timeoutMs: 5000,
+          },
+          {
+            url: 'https://cloudflare-eth.com',
+            provider: 'Public',
+            role: RpcProviderRole.EMERGENCY,
+            type: RpcProviderType.PUBLIC,
+            rateLimitRps: 10,
+            timeoutMs: 10000,
+          },
         ],
+        totalOperationTimeoutMs: 30000,
+        cacheStaleAcceptanceMs: 60000,
       },
       '137': {
-        chainId: '137',
+        chainId: 137,
         chainName: 'Polygon',
         endpoints: [
-          { url: 'https://polygon-mainnet.g.alchemy.com/v2/test-key', provider: 'alchemy', type: 'http' },
-          { url: 'https://polygon-rpc.com', provider: 'public', type: 'http' },
+          {
+            url: 'https://poly-mainnet.gateway.pokt.network/v1/lb/libre',
+            provider: 'POKT Gateway',
+            role: RpcProviderRole.PRIMARY,
+            type: RpcProviderType.DECENTRALIZED,
+            rateLimitRps: 50,
+            timeoutMs: 5000,
+          },
+          {
+            url: 'https://polygon-rpc.com',
+            provider: 'Public',
+            role: RpcProviderRole.EMERGENCY,
+            type: RpcProviderType.PUBLIC,
+            rateLimitRps: 10,
+            timeoutMs: 10000,
+          },
         ],
+        totalOperationTimeoutMs: 30000,
+        cacheStaleAcceptanceMs: 60000,
       },
       'solana-mainnet': {
-        chainId: 'solana-mainnet',
+        chainId: 101,
         chainName: 'Solana',
         endpoints: [
-          { url: 'https://mainnet.helius-rpc.com/?api-key=helius-key', provider: 'helius', type: 'http' },
-          { url: 'https://solana.publicnode.com', provider: 'public', type: 'http' },
+          {
+            url: 'https://solana-mainnet.gateway.pokt.network/v1/lb/libre',
+            provider: 'POKT Gateway',
+            role: RpcProviderRole.PRIMARY,
+            type: RpcProviderType.DECENTRALIZED,
+            rateLimitRps: 50,
+            timeoutMs: 5000,
+          },
+          {
+            url: 'https://solana.publicnode.com',
+            provider: 'Public',
+            role: RpcProviderRole.EMERGENCY,
+            type: RpcProviderType.PUBLIC,
+            rateLimitRps: 10,
+            timeoutMs: 10000,
+          },
         ],
+        totalOperationTimeoutMs: 30000,
+        cacheStaleAcceptanceMs: 60000,
       },
+    },
+    circuitBreaker: {
+      failureThreshold: 5,
+      openDurationMs: 30000,
+      halfOpenMaxAttempts: 2,
+      monitorWindowMs: 60000,
+    },
+    retry: {
+      maxAttempts: 3,
+      baseDelayMs: 1000,
+      maxDelayMs: 10000,
+    },
+    healthCheck: {
+      intervalMs: 30000,
+      timeoutMs: 5000,
+      method: 'eth_blockNumber',
+    },
+    privacy: {
+      rotateWithinTier: true,
+      privacyMode: false,
+      queryJitterMs: 100,
     },
     ...overrides,
   };
@@ -80,11 +149,11 @@ describe('integrationServices', () => {
   });
 
   describe('extractEvmEndpoints', () => {
-    it('returns HTTP URLs for a given chain ID', () => {
+    it('returns all endpoint URLs for a given chain ID', () => {
       const config = makeConfig();
       const urls = extractEvmEndpoints(config, '1');
       expect(urls).toEqual([
-        'https://eth-mainnet.g.alchemy.com/v2/test-key',
+        'https://eth-mainnet.gateway.pokt.network/v1/lb/libre',
         'https://cloudflare-eth.com',
       ]);
     });
@@ -94,25 +163,6 @@ describe('integrationServices', () => {
       const urls = extractEvmEndpoints(config, '999');
       expect(urls).toEqual([]);
     });
-
-    it('filters to HTTP endpoints only', () => {
-      const config: RpcProviderConfig = {
-        environment: 'production',
-        availableProviders: ['alchemy'],
-        chains: {
-          '1': {
-            chainId: '1',
-            chainName: 'Ethereum',
-            endpoints: [
-              { url: 'https://eth.alchemy.com/v2/key', provider: 'alchemy', type: 'http' },
-              { url: 'wss://eth.alchemy.com/v2/key', provider: 'alchemy', type: 'ws' },
-            ],
-          },
-        },
-      };
-      const urls = extractEvmEndpoints(config, '1');
-      expect(urls).toEqual(['https://eth.alchemy.com/v2/key']);
-    });
   });
 
   describe('extractSolanaEndpoints', () => {
@@ -120,22 +170,31 @@ describe('integrationServices', () => {
       const config = makeConfig();
       const urls = extractSolanaEndpoints(config);
       expect(urls).toEqual([
-        'https://mainnet.helius-rpc.com/?api-key=helius-key',
+        'https://solana-mainnet.gateway.pokt.network/v1/lb/libre',
         'https://solana.publicnode.com',
       ]);
     });
 
     it('returns devnet endpoints for testnet environment', () => {
-      const config: RpcProviderConfig = {
+      const config: AppRpcProviderConfig = {
+        ...makeConfig(),
         environment: 'testnet',
-        availableProviders: [],
         chains: {
           'solana-devnet': {
-            chainId: 'solana-devnet',
+            chainId: 103,
             chainName: 'Solana Devnet',
             endpoints: [
-              { url: 'https://api.devnet.solana.com', provider: 'public', type: 'http' },
+              {
+                url: 'https://api.devnet.solana.com',
+                provider: 'Public',
+                role: RpcProviderRole.EMERGENCY,
+                type: RpcProviderType.PUBLIC,
+                rateLimitRps: 10,
+                timeoutMs: 10000,
+              },
             ],
+            totalOperationTimeoutMs: 30000,
+            cacheStaleAcceptanceMs: 60000,
           },
         },
       };
@@ -144,9 +203,8 @@ describe('integrationServices', () => {
     });
 
     it('returns empty array when no Solana chain in config', () => {
-      const config: RpcProviderConfig = {
-        environment: 'production',
-        availableProviders: [],
+      const config: AppRpcProviderConfig = {
+        ...makeConfig(),
         chains: {},
       };
       const urls = extractSolanaEndpoints(config);
@@ -175,7 +233,7 @@ describe('integrationServices', () => {
       expect(mockUpdateChainConfig).toHaveBeenCalledWith(1, {
         endpoints: {
           http: [
-            'https://eth-mainnet.g.alchemy.com/v2/test-key',
+            'https://eth-mainnet.gateway.pokt.network/v1/lb/libre',
             'https://cloudflare-eth.com',
           ],
         },
@@ -197,7 +255,7 @@ describe('integrationServices', () => {
       expect(SolanaIntegrationFacade).toHaveBeenCalledWith({
         environment: 'production',
         rpcEndpoints: [
-          'https://mainnet.helius-rpc.com/?api-key=helius-key',
+          'https://solana-mainnet.gateway.pokt.network/v1/lb/libre',
           'https://solana.publicnode.com',
         ],
       });
@@ -212,9 +270,8 @@ describe('integrationServices', () => {
     });
 
     it('omits rpcEndpoints when no Solana chains in config', () => {
-      const config: RpcProviderConfig = {
-        environment: 'production',
-        availableProviders: [],
+      const config: AppRpcProviderConfig = {
+        ...makeConfig(),
         chains: {},
       };
       createSolIntegration(config);

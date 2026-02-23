@@ -24,11 +24,14 @@ const {
   return {
     mockBuildRpcProviderConfig: vi.fn().mockReturnValue({
       environment: 'production',
-      availableProviders: ['alchemy'],
       chains: {
-        '1': { chainId: '1', chainName: 'Ethereum', endpoints: [] },
-        'solana-mainnet': { chainId: 'solana-mainnet', chainName: 'Solana', endpoints: [] },
+        '1': { chainId: 1, chainName: 'Ethereum', endpoints: [], totalOperationTimeoutMs: 30000, cacheStaleAcceptanceMs: 60000 },
+        'solana-mainnet': { chainId: 101, chainName: 'Solana', endpoints: [], totalOperationTimeoutMs: 30000, cacheStaleAcceptanceMs: 60000 },
       },
+      circuitBreaker: { failureThreshold: 5, openDurationMs: 30000, halfOpenMaxAttempts: 2, monitorWindowMs: 60000 },
+      retry: { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10000 },
+      healthCheck: { intervalMs: 30000, timeoutMs: 5000, method: 'eth_blockNumber' },
+      privacy: { rotateWithinTier: true, privacyMode: false, queryJitterMs: 100 },
     }),
     mockCreateEvmIntegration: vi.fn().mockReturnValue(mockRegistry),
     mockCreateSolIntegration: vi.fn().mockReturnValue(mockFacade),

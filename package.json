@@ -23,6 +23,7 @@
     "@cygnus-wealth/data-models": "^1.2.0",
     "@cygnus-wealth/evm-integration": "^1.1.0",
     "@cygnus-wealth/portfolio-aggregation": "^0.2.0",
+    "@cygnus-wealth/rpc-infrastructure": "^1.0.1",
     "@cygnus-wealth/sol-integration": "^0.1.0",
     "@cygnus-wealth/wallet-integration-system": "^1.1.1",
     "@emotion/react": "^11.14.0",
