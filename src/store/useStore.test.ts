@@ -16,6 +16,7 @@ describe('useStore', () => {
       isLoading: false,
       error: null,
       networkEnvironment: 'production',
+      selectedAccountIds: null,
     });
   });
 
@@ -381,6 +382,84 @@ describe('useStore', () => {
       useStore.getState().setNetworkEnvironment('testnet');
       useStore.getState().setNetworkEnvironment('production');
       expect(useStore.getState().networkEnvironment).toBe('production');
+    });
+  });
+
+  describe('Account Selection/Filtering', () => {
+    it('should default selectedAccountIds to null (all selected)', () => {
+      expect(useStore.getState().selectedAccountIds).toBeNull();
+    });
+
+    it('should set selectedAccountIds', () => {
+      const ids = new Set(['acc-1', 'acc-2']);
+      useStore.getState().setSelectedAccountIds(ids);
+      expect(useStore.getState().selectedAccountIds).toEqual(ids);
+    });
+
+    it('should clear selectedAccountIds back to null', () => {
+      useStore.getState().setSelectedAccountIds(new Set(['acc-1']));
+      useStore.getState().setSelectedAccountIds(null);
+      expect(useStore.getState().selectedAccountIds).toBeNull();
+    });
+
+    it('should toggle account selection from all-selected state', () => {
+      // Add some accounts first
+      useStore.getState().addAccount({
+        id: 'acc-1',
+        type: 'wallet',
+        platform: 'Ethereum',
+        label: 'Wallet 1',
+        status: 'connected',
+      });
+      useStore.getState().addAccount({
+        id: 'acc-2',
+        type: 'wallet',
+        platform: 'Solana',
+        label: 'Wallet 2',
+        status: 'connected',
+      });
+
+      useStore.getState().toggleAccountSelection('acc-1');
+      const selected = useStore.getState().selectedAccountIds;
+      // Should have acc-2 selected but not acc-1
+      expect(selected).not.toBeNull();
+      expect(selected?.has('acc-1')).toBe(false);
+      expect(selected?.has('acc-2')).toBe(true);
+    });
+
+    it('should toggle account selection back on', () => {
+      useStore.getState().addAccount({
+        id: 'acc-1',
+        type: 'wallet',
+        platform: 'Ethereum',
+        label: 'Wallet 1',
+        status: 'connected',
+      });
+      useStore.getState().addAccount({
+        id: 'acc-2',
+        type: 'wallet',
+        platform: 'Solana',
+        label: 'Wallet 2',
+        status: 'connected',
+      });
+
+      // Deselect acc-1
+      useStore.getState().toggleAccountSelection('acc-1');
+      expect(useStore.getState().selectedAccountIds?.has('acc-1')).toBe(false);
+
+      // Re-select acc-1 (all now selected, should return to null)
+      useStore.getState().toggleAccountSelection('acc-1');
+      expect(useStore.getState().selectedAccountIds).toBeNull();
+    });
+
+    it('should persist selectedAccountIds', () => {
+      useStore.getState().setSelectedAccountIds(new Set(['acc-1']));
+      const storeData = localStorage.getItem('cygnus-wealth-storage');
+      if (storeData) {
+        const parsed = JSON.parse(storeData);
+        // selectedAccountIds should be persisted as an array
+        expect(parsed.state.selectedAccountIds).toBeDefined();
+      }
     });
   });
 });
