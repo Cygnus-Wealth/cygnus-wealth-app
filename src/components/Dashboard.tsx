@@ -26,6 +26,8 @@ import { SimpleBalanceCell } from './dashboard/SimpleBalanceCell';
 import { ValueCell } from './dashboard/ValueCell';
 import { DeFiPositions } from './dashboard/DeFiPositions';
 import { shouldHideByDefault } from '../utils/spamFilter';
+import { AccountFilter } from './dashboard/AccountFilter';
+import { useAccountFilter } from '../hooks/useAccountFilter';
 import type { Asset } from '../store/useStore';
 
 const ITEMS_PER_PAGE = 10;
@@ -61,6 +63,10 @@ export default function Dashboard() {
   // DeFi positions
   const { defiPositions, isLoadingDeFi, totalDeFiValue } = useDeFiPositions();
 
+  // Account filtering
+  const { filterAssets, selectedCount, totalWalletCount } = useAccountFilter();
+  const visibleAssets = useMemo(() => filterAssets(assets), [filterAssets, assets]);
+
   // Get connected accounts count
   const connectedAccounts = accounts.filter(acc => acc.status === 'connected').length;
 
@@ -79,7 +85,7 @@ export default function Dashboard() {
     }>();
 
     // Group assets by symbol, chain, and connection type
-    assets.forEach(asset => {
+    visibleAssets.forEach(asset => {
       const account = accounts.find(acc => acc.id === asset.accountId);
       const connectionType = account?.metadata?.connectionType || account?.metadata?.walletType || 'Unknown';
       const walletId = account?.metadata?.walletId || account?.id || '';
@@ -119,7 +125,7 @@ export default function Dashboard() {
     });
 
     return Array.from(assetMap.values());
-  }, [assets, accounts]);
+  }, [visibleAssets, accounts]);
 
   // Filter assets: hide spam, worthless, zero-balance, and dust tokens by default
   const filteredAssets = showHiddenTokens
@@ -198,16 +204,25 @@ export default function Dashboard() {
                   {connectedAccounts}
                 </Stat.ValueText>
                 <Stat.HelpText>
-                  <Button asChild size="sm" variant="plain" colorPalette="blue">
-                    <Link to="/settings/connections">
-                      {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
-                    </Link>
-                  </Button>
+                  {selectedCount < totalWalletCount && totalWalletCount > 0 ? (
+                    <Text fontSize="xs" color="orange.500">
+                      Showing {selectedCount} of {totalWalletCount} accounts
+                    </Text>
+                  ) : (
+                    <Button asChild size="sm" variant="plain" colorPalette="blue">
+                      <Link to="/settings/connections">
+                        {connectedAccounts === 0 ? 'Add accounts' : 'Manage'}
+                      </Link>
+                    </Button>
+                  )}
                 </Stat.HelpText>
               </Stat.Root>
             </Grid>
           </Stack>
         </Box>
+
+        {/* Account Filter */}
+        <AccountFilter />
 
         {/* Assets Table - Always visible */}
         <Box p={6} bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" shadow="sm" position="relative">

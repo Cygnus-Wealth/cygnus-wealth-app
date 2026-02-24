@@ -1,8 +1,15 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { ChakraProvider, defaultSystem } from '@chakra-ui/react';
 import { useStore } from '../../../store/useStore';
 import { AccountFilter } from '../AccountFilter';
 import type { Account } from '../../../store/useStore';
+
+function renderWithChakra(ui: React.ReactElement) {
+  return render(
+    <ChakraProvider value={defaultSystem}>{ui}</ChakraProvider>
+  );
+}
 
 const makeAccount = (overrides: Partial<Account> & { id: string }): Account => ({
   type: 'wallet',
@@ -55,31 +62,31 @@ describe('AccountFilter', () => {
   });
 
   it('should render wallet provider group headers', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
     expect(screen.getByText('MetaMask')).toBeTruthy();
     expect(screen.getByText('Phantom')).toBeTruthy();
   });
 
   it('should show account count summary', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
     expect(screen.getByText(/3 of 3/)).toBeTruthy();
   });
 
   it('should show individual account labels', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
     expect(screen.getByText('MetaMask Account 1')).toBeTruthy();
     expect(screen.getByText('MetaMask Account 2')).toBeTruthy();
     expect(screen.getByText('Phantom Account 1')).toBeTruthy();
   });
 
   it('should show truncated addresses', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
     // 0xaaa1 should show as 0xaaa1 (short enough to not truncate) or truncated
     expect(screen.getByText(/0xaaa1/)).toBeTruthy();
   });
 
   it('should toggle individual account when clicked', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
 
     const account1Label = screen.getByText('MetaMask Account 1');
     // Click the account label row to toggle
@@ -97,7 +104,7 @@ describe('AccountFilter', () => {
       selectedAccountIds: new Set(['mm-2', 'phantom-1']),
     });
 
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
 
     const allButton = screen.getByTestId('select-all-accounts');
     fireEvent.click(allButton);
@@ -110,7 +117,7 @@ describe('AccountFilter', () => {
       selectedAccountIds: new Set(['mm-1', 'phantom-1']),
     });
 
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
     expect(screen.getByText(/2 of 3/)).toBeTruthy();
   });
 
@@ -126,12 +133,12 @@ describe('AccountFilter', () => {
       ],
     });
 
-    const { container } = render(<AccountFilter />);
-    expect(container.firstChild).toBeNull();
+    renderWithChakra(<AccountFilter />);
+    expect(screen.queryByTestId('select-all-accounts')).toBeNull();
   });
 
   it('should toggle entire group when group header is clicked', () => {
-    render(<AccountFilter />);
+    renderWithChakra(<AccountFilter />);
 
     const groupToggle = screen.getByTestId('group-toggle-MetaMask');
     fireEvent.click(groupToggle);

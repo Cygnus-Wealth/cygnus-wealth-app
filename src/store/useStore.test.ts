@@ -16,6 +16,7 @@ describe('useStore', () => {
       isLoading: false,
       error: null,
       networkEnvironment: 'production',
+      selectedAccountIds: null,
     });
   });
 

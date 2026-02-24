@@ -122,6 +122,11 @@ interface AppState {
   defiError: string | null;
   setDeFiError: (error: string | null) => void;
 
+  // Account Selection/Filtering
+  selectedAccountIds: Set<string> | null; // null = all accounts selected
+  setSelectedAccountIds: (ids: Set<string> | null) => void;
+  toggleAccountSelection: (accountId: string) => void;
+
   // UI State
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
@@ -148,6 +153,7 @@ export const useStore = create<AppState>()(
       defiPositions: [],
       isLoadingDeFi: false,
       defiError: null,
+      selectedAccountIds: null,
       isLoading: false,
       error: null,
 
@@ -254,6 +260,30 @@ export const useStore = create<AppState>()(
       setIsLoadingDeFi: (loading) => set({ isLoadingDeFi: loading }),
       setDeFiError: (error) => set({ defiError: error }),
 
+      // Account Selection/Filtering actions
+      setSelectedAccountIds: (ids) => set({ selectedAccountIds: ids }),
+      toggleAccountSelection: (accountId) => {
+        const state = get();
+        const walletAccounts = state.accounts.filter(a => a.type === 'wallet');
+
+        if (state.selectedAccountIds === null) {
+          // Currently all selected → deselect this one
+          const newSet = new Set(walletAccounts.map(a => a.id));
+          newSet.delete(accountId);
+          set({ selectedAccountIds: newSet });
+        } else {
+          const newSet = new Set(state.selectedAccountIds);
+          if (newSet.has(accountId)) {
+            newSet.delete(accountId);
+          } else {
+            newSet.add(accountId);
+          }
+          // If all wallet accounts are now selected, reset to null
+          const allSelected = walletAccounts.every(a => newSet.has(a.id));
+          set({ selectedAccountIds: allSelected ? null : newSet });
+        }
+      },
+
       // UI State actions
       setIsLoading: (loading) => set({ isLoading: loading }),
       setError: (error) => set({ error }),
@@ -273,7 +303,22 @@ export const useStore = create<AppState>()(
         prices: state.prices,
         portfolio: state.portfolio,
         defiPositions: state.defiPositions,
+        // Persist as array for JSON serialization, rehydrate as Set
+        selectedAccountIds: state.selectedAccountIds
+          ? Array.from(state.selectedAccountIds)
+          : null,
       }),
+      merge: (persisted, current) => {
+        const persistedState = persisted as Record<string, unknown>;
+        const selectedRaw = persistedState?.selectedAccountIds;
+        return {
+          ...current,
+          ...persistedState,
+          selectedAccountIds: Array.isArray(selectedRaw)
+            ? new Set(selectedRaw as string[])
+            : null,
+        };
+      },
     }
   )
 );
